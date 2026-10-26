@@ -1,4 +1,4 @@
-/* ALOHOMORA · REBORN 1.1 — Cinematic Magic, Chapter I — mobile 3D vertical slice.
+/* ALOHOMORA · REBORN 1.2 — The Living Highlands, Chapter I — mobile 3D vertical slice.
  * Rendering: Babylon.js, animations: GLB (optional) + procedural fallback.
  * Character source: three.js examples Soldier.glb (MIT sample). Geometry/textures
  * created here are original; 3D asset is optional and loaded separately.
@@ -20,6 +20,12 @@
     {name:'Revelio',cost:14,color:'#b4a6eb'}
   ];
   const projectiles=[], fx=[], props=[], colliders=[];
+  const world={time:19.15/24,weather:'sereno',rain:null,train:null,actors:[],wild:[],lastZone:'',onTrain:false,trainSeatZ:0,zoneTick:0,
+    stationVisited:false,villageVisited:false,forestVisited:false,portalUnsealed:false,dialogues:0,daySpeed:1/840,lastSave:0,locNames:[],timeSinceRain:0};
+  const landmarks=[{name:'Hogwarts',x:0,z:-26,icon:'🏰'},{name:'Hogsmeade',x:106,z:28,icon:'✦'},{name:'Foresta Proibita',x:-115,z:82,icon:'♠'},{name:'Stazione',x:143,z:122,icon:'🚂'},{name:'Lago Nero',x:-130,z:-121,icon:'◈'}];
+  function saveWorld(){try{localStorage.setItem('alohomora-world-v12',JSON.stringify({time:world.time,quests:{village:world.villageVisited,forest:world.forestVisited,station:world.stationVisited},savedAt:Date.now()}));}catch(e){}}
+  function zoneAt(x,z){if(x>66&&z>72)return 'Stazione di Hogsmeade';if(x>62&&z>-35)return 'Hogsmeade · Piazza dei maghi';if(x<-62&&z>15)return 'Foresta Proibita';if(x<-72&&z< -45)return 'Sponde del Lago Nero';if(Math.abs(x)<43&&z<33)return 'Hogwarts · Cortile settentrionale';return 'Le Highlands incantate';}
+
   const cinematic={pipeline:null,particleTexture:null,shield:null,shieldMat:null,shieldRing:null,shieldLight:null,lamp:null,
     flash:0,flashColor:'#e27054',shake:0,revelioWaves:[],perfTime:0,perfSamples:0,qualityReduced:false};
   const effectiveCount=(n)=>mobile?Math.min(45,Math.round(n*.56)):n;
@@ -144,8 +150,8 @@
   function sphere(n,diam,x,y,z,mat,seg=10){const m=B.MeshBuilder.CreateSphere(n,{diameter:diam,segments:seg},scene);m.position.set(x,y,z);m.material=mat;m.isPickable=false;return m;}
   function tube(n,from,to,r,mat,seg=8){const diff=to.subtract(from),len=diff.length();const m=B.MeshBuilder.CreateCylinder(n,{height:len,diameter:r*2,tessellation:seg},scene);m.position=from.add(to).scale(.5);const up=V(0,1,0),axis=B.Vector3.Cross(up,diff).normalize();const angle=Math.acos(clamp(B.Vector3.Dot(up,diff.normalize()),-1,1));if(axis.lengthSquared()>.0001)m.rotationQuaternion=B.Quaternion.RotationAxis(axis,angle);m.material=mat;return m;}
   function stoneGround(){const stone=material('wet sandstone','#757877',{spec:'#36393d',shine:9});stone.diffuseTexture=noiseTexture('repeated cut stone','#777b78','#83847f','stone');stone.diffuseTexture.uScale=15;stone.diffuseTexture.vScale=15;
-    const earth=material('highland ground','#4a5b52',{spec:'#161f1b'});earth.diffuseTexture=noiseTexture('heather and damp moss','#4b5b4e','#64705b');earth.diffuseTexture.uScale=26;earth.diffuseTexture.vScale=26;
-    const plane=B.MeshBuilder.CreateGround('Scottish moor',{width:210,height:210,subdivisions:2},scene);plane.material=earth;plane.receiveShadows=true;
+    const earth=material('highland ground','#4a5b52',{spec:'#161f1b'});earth.diffuseTexture=noiseTexture('heather and damp moss','#4b5b4e','#64705b');earth.diffuseTexture.uScale=70;earth.diffuseTexture.vScale=70;
+    const plane=B.MeshBuilder.CreateGround('Scottish highlands open terrain',{width:570,height:570,subdivisions:2},scene);plane.material=earth;plane.receiveShadows=true;
     const floor=B.MeshBuilder.CreateGround('quadrangle cobbles',{width:49,height:62},scene);floor.position.z=-12;floor.position.y=.035;floor.material=stone;floor.receiveShadows=true;
     const pathMat=material('walkway flagstones','#777c79',{spec:'#2a3034'});const ptex=noiseTexture('mottled stones','#858780','#777b76','stone');ptex.uScale=1.4;ptex.vScale=1.4;pathMat.diffuseTexture=ptex;
     const tile=box('flagstone source',1.26,.12,1.42,0,-1000,0,pathMat);/* source stone remains far outside the playable map; instances stay visible */
@@ -155,11 +161,11 @@
     const log=cylinder('instanced log',.20,.30,3,0,-1000,0,trunk);/* source trunk offscreen */
     const leaves=cylinder('instanced fir',0,4.2,8,0,-1000,0,foliage,7);/* source canopy offscreen */
     const leaves2=cylinder('instanced fir b',0,3.5,7,0,-1000,0,foliage2,7);/* source alternate canopy offscreen */
-    for(let i=0;i<165;i++){let x=(rand(i,1)*2-1)*102,z=(rand(i,2)*2-1)*103;if(Math.abs(x)<31&&z>-69&&z<47)continue;let sy=.8+rand(i,5)*1.5;
+    for(let i=0;i<440;i++){let x=(rand(i,1)*2-1)*268,z=(rand(i,2)*2-1)*268;if((Math.abs(x)<36&&z>-72&&z<48)||(x>77&&x<166&&z>-34&&z<155)||(x<-100&&x>-177&&z< -91))continue;let sy=.8+rand(i,5)*1.5;
       const a=log.createInstance('ancient fir trunk');a.setEnabled(true);a.position.set(x,1.5*sy,z);a.scaling.setAll(sy);
       const b=(i%3===0?leaves2:leaves).createInstance('fir canopy');b.setEnabled(true);b.position.set(x,5.4*sy,z);b.scaling.setAll(sy);
     }
-    for(let i=0;i<50;i++){const x=rand(i,66)*125-63,z=rand(i,41)*150-75;if(Math.abs(x)<28&&z<36&&z>-57)continue;const r=sphere('mossy boulder',1.3+rand(i,6)*2,x,.45,z,rock,5);r.scaling.y=.5;r.rotation.y=rand(i,7)*6.2;}
+    for(let i=0;i<95;i++){const x=rand(i,66)*430-215,z=rand(i,41)*425-205;if(Math.abs(x)<28&&z<36&&z>-57)continue;const r=sphere('mossy boulder',1.3+rand(i,6)*2,x,.45,z,rock,5);r.scaling.y=.5;r.rotation.y=rand(i,7)*6.2;}
   }
   function architecture(){const stone=material('castle masonry','#4e5458',{spec:'#30373c',shine:16});stone.diffuseTexture=noiseTexture('medieval walls','#6e7375','#777b7e','stone');stone.diffuseTexture.uScale=3;stone.diffuseTexture.vScale=2;
     const slate=material('slate roof','#1b2934',{spec:'#232c32',shine:32});const edge=material('ashlar blocks','#767575',{spec:'#262526'});const iron=material('wrought iron','#161b20',{spec:'#555050'});
@@ -229,6 +235,180 @@
     colliders.push({x:0,z:-55,w:65,d:13});colliders.push({x:-27,z:-12,w:2,d:64});colliders.push({x:27,z:-12,w:2,d:64});
     return {stone,iron,edge,windows};
   }
+
+  // World 1.2: contiguous explorable locations instead of sealed mini-rooms. Geometry is entirely local.
+  function worldExpansion(){
+    const stone=material('Hogsmeade weathered limestone','#6b6460',{spec:'#45403f'}),roof=material('aged slate gables','#222c35',{spec:'#424750',shine:35});
+    const plaster=material('old village plaster','#918477',{spec:'#483f35'}),timber=material('smoked oak beams','#372e2b',{spec:'#4c3932'});
+    const windows=material('Hogsmeade glowing windows','#ad7840',{emissive:'#b47735'}),waterMat=material('black lake shallow reflection','#122c33',{spec:'#a4bcc9',shine:110,alpha:.92});
+    const track=material('railway black iron','#292f35',{spec:'#979188',shine:90}),sleepers=material('oiled railway timber','#42322b'),platform=material('platform sandstone','#6a6157');
+    const path=material('old cobblestone path','#807c75',{spec:'#353e44',shine:18});path.diffuseTexture=noiseTexture('village cobbles','#898781','#77766f','stone');path.diffuseTexture.uScale=16;path.diffuseTexture.vScale=4;
+    function linkRoad(a,b,width=6){const mid=V((a[0]+b[0])/2,.058,(a[1]+b[1])/2),len=Math.hypot(b[0]-a[0],b[1]-a[1]);const m=box('historic cobbled causeway',width,.10,len,mid.x,mid.y,mid.z,path);m.rotation.y=-Math.atan2(b[0]-a[0],b[1]-a[1]);return m;}
+    linkRoad([0,44],[16,57],7);linkRoad([16,57],[67,55],7);linkRoad([67,55],[104,30],7);linkRoad([108,43],[127,81],6);linkRoad([127,81],[141,123],6);
+    linkRoad([0,53],[-50,66],5);linkRoad([-50,66],[-112,86],5);linkRoad([-47,-63],[-115,-115],4);
+    for(let j=0;j<18;j++){
+      const side=j%2===0?-1:1,row=Math.floor(j/2),x=105+side*(9+row%3*5),z=55-row*11;
+      const h=6+rand(j,12)*4.8,w=6+rand(j,16)*2.4,d=7+rand(j,14)*2;
+      const wall=j%4===0?plaster:stone;
+      box('Hogsmeade inn or shop',w,h,d,x,h/2,z,wall,{shadow:true,collision:true});
+      const gable=B.MeshBuilder.CreateCylinder('steep timbered cottage roof',{diameterTop:0,diameterBottom:w*1.45,height:4,tessellation:4},scene);gable.position.set(x,h+1.9,z);gable.rotation.y=Math.PI/4;gable.scaling.z=d/w;gable.material=roof;
+      for(let k of [-1,1]){box('cottage timber corners',.24,h,.25,x+k*w*.43,h/2,z+d*.51,timber);box('amber glass cottage window',1.0,1.55,.13,x+k*w*.24,h*.60,z+d*.512,windows);}
+      box('oak shop door',1.25,2.5,.21,x,1.3,z+d*.52,timber);
+      const sign=box('swinging shop sign',2,.8,.14,x+2.1,h*.76,z+d*.55,roof);sign.rotation.y=.08;
+      if(j%3===0){const chimney=box('chimney',.95,3.5,1.1,x+w*.31,h+1.4,z-d*.12,stone);chimney.rotation.y=.15;}
+      if(j%4===0)lantern(x+side*4,z+side*2);
+    }
+    // Enchanted square with an actual fountain, market lanterns and market stalls.
+    const square=box('village market square',28,.12,30,105,.03,31,path);
+    cylinder('village fountain',7.5,8,.8,105,.52,30,stone,16);
+    cylinder('village fountain basin',6,7,.42,105,1.07,30,waterMat,18);
+    sphere('fountain enchanted orb',1.1,105,3.2,30,material('water spirit','#8ecaca',{emissive:'#316f85'}),16);
+    for(let j=0;j<7;j++){const x=92+(j%4)*8,z=61+Math.floor(j/4)*9;
+      for(let s of [-1,1])box('market stall post',.2,3.1,.2,x+s*1.8,1.55,z,timber);
+      const canopy=box('merchant canopy',4.6,.27,2.5,x,3.1,z,j%2?roof:windows);canopy.rotation.z=j%2?.06:-.04;
+      for(let k=0;k<3;k++)box('market potions',.35,.55,.35,x-1+k,.78,z+.3,material('potion bottle'+j+k,k===1?'#567f92':'#7b554e',{emissive:'#1e303a'}));
+    }
+    // Station: accessible platform, arched entrance, locomotive and tracks from distant valleys.
+    const station=box('Hogsmeade station hall',23,10,17,112,5.1,122,stone,{collision:true});
+    const stRoof=B.MeshBuilder.CreateCylinder('station sloped slate roof',{diameterTop:0,diameterBottom:26,height:7,tessellation:4},scene);stRoof.rotation.y=Math.PI/4;stRoof.position.set(112,13.2,122);stRoof.scaling.z=.68;stRoof.material=roof;
+    for(let j=0;j<5;j++){const x=102+j*5;box('station window glass',2.1,3.6,.2,x,5.0,130.6,windows);}
+    box('raised platform',20,.66,96,124,.37,116,platform);
+    for(let z=-230;z<266;z+=3.4){box('railway sleeper',7,.26,.48,145,.12,z,sleepers);}
+    for(let x of [143.25,146.75])box('railway long running steel rail',.20,.25,510,x,.39,13,track);
+    for(let z of [84,140,190])lantern(128,z);
+    const train=new B.TransformNode('Hogwarts Express physically moving',scene);
+    train.position=V(145,0,180);world.train={root:train,z:180,speed:-9,phase:0,doorsOpen:false};
+    const red=material('express red lacquer','#68151a',{spec:'#aa5651',shine:85}),coal=material('coal-black locomotive','#161d23',{spec:'#a0a0a1',shine:85}),gold=material('express brass fittings','#c2a066',{spec:'#eac783',shine:100});
+    const child=(name,w,h,d,x,y,z,m)=>{const a=box(name,w,h,d,x,y,z,m);a.parent=train;a.position.set(x,y,z);return a;};
+    child('steam locomotive engine boiler',4.6,3.2,10.6,0,2.9,-13,coal);
+    child('red express locomotive cab',4.9,4.3,5.5,0,3.3,-5,red);
+    for(let i=0;i<2;i++){child('express carriage '+i,5,4.0,17,0,2.7,7+i*18,red);child('carriage slate roof',5.5,.32,17.4,0,4.86,7+i*18,coal);
+      for(let z=0;z<6;z++)for(let side of [-1,1])child('express amber carriage window',.1,1.3,1.45,side*2.57,3.2,1+i*18+z*2.5,windows);
+    }
+    for(let z=-16;z<44;z+=4.9)for(let x of [-2,2]){
+      const wheel=cylinder('steel carriage wheel',1.65,1.65,.26,0,0,0,coal,12);wheel.parent=train;wheel.position.set(x,1.03,z);wheel.rotation.z=Math.PI/2;
+    }
+    const funnel=cylinder('steam funnel',1.25,.9,2.9,0,0,0,coal,10);funnel.parent=train;funnel.position.set(0,5,-16);
+    child('locomotive golden numberplate',2.8,.9,.14,0,4.2,-2.15,gold);
+    world.train.light=new B.PointLight('express headlight',V(0,3,-20),scene);world.train.light.parent=train;world.train.light.intensity=.75;world.train.light.range=22;
+    // Lake with waves, steep banks and a stone bridge looking onto the mountains.
+    const shore=box('black lake glassy water',92,.15,108,-136,-.18,-123,waterMat);shore.rotation.y=-.10;
+    const moon=material('moonstone','#9ba2aa',{spec:'#c3c7c9',shine:100});
+    for(let j=0;j<26;j++){const a=j*Math.PI*2/26,x=-136+Math.sin(a)*49,z=-123+Math.cos(a)*58;
+      let rock=sphere('lake shore boulder',1.7+rand(j,75)*4,x,.2,z,stone,6);rock.scaling.y=.33;
+    }
+    for(let j=0;j<7;j++){let x=-98+j*5;box('old bridge slab',5,.42,3.4,x,.65,-88,moon);for(const zz of [-90,-86])box('bridge wall',5,.75,.22,x,1.10,zz,stone);}
+    // Forest standing stones and a secret glade, reachable on foot.
+    for(let j=0;j<12;j++){const a=j*Math.PI/6,x=-115+Math.cos(a)*13,z=88+Math.sin(a)*13;
+      const h=4+rand(j,13)*3;box('forbidden runestone',1.8,h,1.25,x,h/2,z,stone);sphere('ancient rune glint',.34,x,h*.78,z,material('forest rune', '#82989b',{emissive:'#445d86'}));}
+    const heart=sphere('forest ghostlight',1.65,-115,4.8,88,material('forest heart','#8bc1c4',{emissive:'#5f8f9a',alpha:.77}),18);heart.metadata={pulse:true};world.forestHeart=heart;
+    // Longer draw distance, remote silhouettes and a road that rewards exploring on a broom.
+    for(let i=0;i<28;i++){let x=-260+rand(i,19)*520,z=-250+rand(i,21)*520;
+      const tower=cylinder('distant watchtower',5,7,15,x,7.5,z,stone,8);
+      const cap=B.MeshBuilder.CreateCylinder('watchtower spire',{diameterTop:0,diameterBottom:9,height:6,tessellation:8},scene);cap.position=V(x,18,z);cap.material=roof;
+    }
+    spawnLivingActors();
+    // Physically animated localized rain: the particle emitter follows the player.
+    try{const rain=new B.ParticleSystem('Highlands passing rain',mobile?360:1150,scene);
+      rain.particleTexture=magicParticleTexture();rain.emitter=V(0,15,0);
+      rain.minEmitBox=V(-23,0,-23);rain.maxEmitBox=V(23,0,23);
+      rain.color1=new B.Color4(.67,.79,.88,.43);rain.color2=new B.Color4(.49,.60,.73,.24);rain.colorDead=new B.Color4(.4,.5,.65,0);
+      rain.minSize=.035;rain.maxSize=.075;rain.minLifeTime=.55;rain.maxLifeTime=1.0;
+      rain.emitRate=mobile?420:900;rain.direction1=V(-.8,-15,-.5);rain.direction2=V(.7,-19,.5);
+      rain.minEmitPower=.10;rain.maxEmitPower=.25;rain.gravity=V(0,-9,0);
+      rain.blendMode=B.ParticleSystem.BLENDMODE_STANDARD;world.rain=rain;world.rainStarted=false;
+    }catch(e){console.warn('Meteo particellare disattivato:',e.message);}
+  }
+  function spawnLivingActors(){
+    const outfits={student:['#39475e','#b9afa1'],teacher:['#4f3e4d','#cbb6a1'],villager:['#554437','#c4aa90'],guard:['#333947','#bda995'],shade:['#181c27','#aaa0b8']};
+    const defs=[
+      ['Alma · studentessa','student',-7,51,'Hogwarts','La scuola custodisce stanze che cambiano posizione.'],
+      ['Professor Rowan','teacher',5,47,'Hogwarts','Lumos non serve solo a vedere. Il castello reagisce alla luce.'],
+      ['Nevin · apprendista','student',23,61,'Hogwarts','Se attraversi la brughiera arriverai al villaggio.'],
+      ['Elowen · libraia','villager',100,49,'Hogsmeade','Cerca i tomi perduti nella Foresta Proibita.'],
+      ['Bram · mercante','villager',112,35,'Hogsmeade','I treni passano dalla stazione a est.'],
+      ['Viola · guaritrice','teacher',92,18,'Hogsmeade','La vita torna quando ci concediamo un momento di riposo.'],
+      ['Sir Emmett','guard',127,108,'Stazione','Il treno percorre l’intera valle. Puoi salirci quando rallenta.'],
+      ['Capostazione','villager',124,128,'Stazione','Attendi sul marciapiede e tocca INTERAGISCI per salire.'],
+      ['Studente smarrito','student',-110,78,'Foresta','Ho visto una luce oltre le pietre antiche.'],
+      ['Custode della foresta','guard',-133,102,'Foresta','Non disturbare le creature nella nebbia.'],
+      ['Ombra errante','shade',-137,83,'Foresta','...'],
+      ['Ombra del bosco','shade',-92,116,'Foresta','...'],
+      ['Cercatore di rune','student',-81,105,'Foresta','Il lago nasconde l’eco degli incantesimi.'],
+      ['Viaggiatore','villager',72,52,'Strada','La valle non dorme mai.']
+    ];
+    for(let i=0;i<defs.length;i++){
+      const [name,kind,x,z,region,line]=defs[i],palette=outfits[kind],cloak=material('npc cloak '+i,palette[0]),face=material('npc skin '+i,palette[1]),trim=material('npc trim '+i,kind==='shade'?'#875969':'#9e876b',{emissive:kind==='shade'?'#3b1d25':undefined});
+      const root=new B.TransformNode(name,scene);root.position=V(x,0,z);
+      const add=(mesh,xx,yy,zz)=>{mesh.parent=root;mesh.position.set(xx,yy,zz);return mesh};
+      add(cylinder('tailored long robe',.74,1.35,1.8,0,0,0,cloak,8),0,1.22,0);
+      add(cylinder('shouldered tabard',.82,.83,.68,0,0,0,trim,8),0,2.2,0);
+      add(sphere('character sculpted head',.50,0,0,0,face,9),0,2.8,0);
+      add(cylinder('dark wool cowl',0,.92,.64,0,0,0,cloak,8),0,3.26,0);
+      const l=add(cylinder('left animated sleeve',.28,.36,1.15,0,0,0,cloak,7),-.57,1.98,0);
+      const r=add(cylinder('right animated sleeve',.28,.36,1.15,0,0,0,cloak,7),.57,1.98,0);
+      add(cylinder('wand',.027,.08,.66,0,0,0,trim,6),.88,1.66,.19);
+      for(let k of [-1,1])add(sphere('eye',.06,0,0,0,trim,6),k*.16,2.84,.23);
+      world.actors.push({name,kind,region,line,x,z,homeX:x,homeZ:z,root,left:l,right:r,phase:i*1.2,hp:kind==='shade'?3:999,stun:0,alive:true,patrol:rand(i,21)*6,aggro:false,voiceAt:0,interacted:false});
+    }
+  }
+  function nearestActor(range=5.3){let selected=null,best=range;for(const a of world.actors){if(!a.alive||a.kind==='shade')continue;const d=distance(cam.position.x,cam.position.z,a.x,a.z);if(d<best){best=d;selected=a}}return selected;}
+  function updateLivingWorld(dt){
+    world.time=(world.time+dt*world.daySpeed)%1;
+    const raining=(Math.sin(phase/52-1.35)>.39);const weather=raining?'pioggia':'sereno';
+    if(weather!==world.weather){world.weather=weather;if(game.running)toast(raining?'La pioggia attraversa le Highlands':'La nebbia si dirada',2.6);}
+    if(world.rain){world.rain.emitter=cam.position.add(V(0,18,0));
+      if(raining&&!world.rainStarted){world.rain.start();world.rainStarted=true;}
+      else if(!raining&&world.rainStarted){world.rain.stop();world.rainStarted=false;}}
+
+    const hh=world.time*24,daylight=clamp((Math.sin((hh-6)/24*Math.PI*2)+.33)*.75,.11,1);
+    ambient.intensity=.24+daylight*.63;sun.intensity=.19+daylight*1.36;
+    sun.direction=V(-.46,-.46-daylight*.42,Math.cos(world.time*Math.PI*2)*.38);
+    scene.fogDensity=.0027+(1-daylight)*.0026+(world.weather==='pioggia'?.0013:0);
+    scene.fogColor=B.Color3.Lerp(B.Color3.FromHexString('#243040'),B.Color3.FromHexString('#7c8290'),daylight);
+    for(const torch of game.torches)torch.light.intensity=(mobile?.45:.75)+(1-daylight)*.50+Math.sin(phase*11+torch.phase)*.08;
+    if(world.train){const tr=world.train;tr.z+=tr.speed*dt;if(tr.z>230){tr.z=230;tr.speed=-Math.abs(tr.speed)}if(tr.z< -198){tr.z=-198;tr.speed=Math.abs(tr.speed)}
+      tr.root.position.z=tr.z;tr.root.rotation.y=tr.speed<0?0:Math.PI;tr.light.intensity=daylight<.4?1.7:.8;
+      if(world.onTrain&&game.running){cam.position.x=tr.root.position.x;cam.position.z=tr.z+world.trainSeatZ;cam.position.y=4.15+Math.sin(phase*8)*.04;game.vx=game.vz=game.vy=0;}
+    }
+    for(const a of world.actors){if(!a.alive){a.root.setEnabled(false);continue;}a.stun=Math.max(0,a.stun-dt);let dx=0,dz=0;
+      const d=distance(cam.position.x,cam.position.z,a.x,a.z);const regionActive=d<95;
+      if(regionActive&&a.stun<=0){
+        if(a.kind==='shade'&&game.running&&d<18&&!world.onTrain){a.aggro=true;dx=cam.position.x-a.x;dz=cam.position.z-a.z;
+          if(d<2.25&&(!a.voiceAt||phase-a.voiceAt>2.5)){a.voiceAt=phase;game.hp=Math.max(0,game.hp-8);flash('#b72b44',.15);if(game.hp<=0)lose();}}
+        else{const theta=phase*(a.kind==='guard'?.15:.25)+a.phase;const targetX=a.homeX+Math.sin(theta)*5.0,targetZ=a.homeZ+Math.cos(theta*.68)*4.0;dx=targetX-a.x;dz=targetZ-a.z;}
+        const len=Math.hypot(dx,dz);if(len>.22){const speed=a.kind==='shade'?2.0:.68;a.x+=dx/len*Math.min(len,speed*dt);a.z+=dz/len*Math.min(len,speed*dt);a.root.rotation.y=Math.atan2(dx,dz);}
+      }
+      a.root.position.set(a.x,Math.sin(phase*1.8+a.phase)*.025,a.z);
+      a.left.rotation.z=.13+Math.sin(phase*2.6+a.phase)*.12;
+      a.right.rotation.z=-.15-Math.sin(phase*2.6+a.phase)*.11;
+    }
+    if(world.forestHeart)world.forestHeart.scaling.setAll(1+Math.sin(phase*2)*.22);
+    const zone=zoneAt(cam.position.x,cam.position.z);
+    if(zone!==world.lastZone&&game.running){world.lastZone=zone;document.querySelector('.zone').textContent=zone;
+      if(zone.includes('Hogsmeade')&&!world.villageVisited){world.villageVisited=true;game.xp+=50;}
+      if(zone.includes('Foresta')&&!world.forestVisited){world.forestVisited=true;game.xp+=50;}
+      if(zone.includes('Stazione')&&!world.stationVisited){world.stationVisited=true;game.xp+=50;}
+      toast('✦ '+zone,2.2);saveWorld();}
+    world.zoneTick+=dt;if(world.zoneTick>.22){world.zoneTick=0;drawMinimap();updateWorldHUD();}
+  }
+  function drawMinimap(){const canvas=$('minimap');if(!canvas)return;const g=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    g.clearRect(0,0,w,h);g.fillStyle='rgba(13,19,27,.78)';g.fillRect(0,0,w,h);
+    const px=cam.position.x,pz=cam.position.z,scale=.43;const project=(x,z)=>[w/2+(x-px)*scale,h/2+(z-pz)*scale];
+    g.strokeStyle='#a68f6b45';g.lineWidth=2;g.beginPath();let chain=[[0,50],[67,55],[104,30],[127,81],[141,123]];
+    for(let j=0;j<chain.length;j++){const [x,y]=project(...chain[j]);if(j===0)g.moveTo(x,y);else g.lineTo(x,y)}g.stroke();
+    for(const m of landmarks){const [x,y]=project(m.x,m.z);if(x<0||x>w||y<0||y>h)continue;g.fillStyle='#b8b4a0';g.beginPath();g.arc(x,y,3.6,0,6.283);g.fill();}
+    for(const a of world.actors)if(a.alive){const [x,y]=project(a.x,a.z);if(x<2||x>w-2||y<2||y>h-2)continue;g.fillStyle=a.kind==='shade'?'#b84e5b':'#8eb1b2';g.fillRect(x-1.6,y-1.6,3.2,3.2);}
+    g.translate(w/2,h/2);g.rotate(-game.yaw);g.fillStyle='#edd3a2';g.beginPath();g.moveTo(0,-8);g.lineTo(5,6);g.lineTo(0,3);g.lineTo(-5,6);g.closePath();g.fill();
+  }
+  function updateWorldHUD(){const clock=$('worldTime');if(clock){let minutes=Math.floor(world.time*1440);clock.textContent=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0')+' · '+(world.time<.25||world.time>.79?'NOTTE':world.time>.68?'TRAMONTO':'GIORNO')+(world.weather==='pioggia'?' · PIOGGIA':'');}
+    const a=nearestActor();const nearTrain=world.train&&distance(cam.position.x,cam.position.z,145,world.train.z)<8&&Math.abs(cam.position.z-world.train.z)<32;
+    const portal=distance(cam.position.x,cam.position.z,0,-39.2)<7;
+    const btn=$('interact');if(!btn)return;btn.classList.toggle('hidden',!(a||nearTrain||portal||world.onTrain));
+    if(world.onTrain)btn.textContent='✋ Scendi dal treno';else if(a)btn.textContent='✋ Parla: '+a.name;else if(nearTrain)btn.textContent='🚂 Sali sul treno';else if(portal)btn.textContent='✧ Esamina la porta';
+    if(!game.running)btn.classList.add('hidden');
+  }
+
   function lantern(x,z){const dark=material('lantern black iron','#2d2d2f',{spec:'#877763'}),flame=material('lantern fire','#ce853c',{emissive:'#f89e41'});
     cylinder('lamp column',.16,.29,4.9,x,2.5,z,dark,8);box('bronze lamp base',.8,.38,.8,x,5.00,z,dark);
     sphere('fire behind glass',.47,x,5.4,z,flame,9);
@@ -238,20 +418,20 @@
   function glints(){const mat=material('luminescent insects','#96ba9b',{emissive:'#b9bf83'});for(let i=0;i<45;i++){let x=(rand(i,12)-.5)*67,z=(rand(i,32)-.5)*70;const p=sphere('floating motes',.06+rand(i,2)*.07,x,1.5+rand(i,77)*5,z,mat,4);fx.push({mesh:p,origin:p.position.clone(),phase:i*1.75,kind:'mote'});}}
   function sceneSetup(){
     engine=new B.Engine(canvas,true,{preserveDrawingBuffer:false,stencil:true,antialias:false},false);
-    engine.setHardwareScalingLevel(mobile?1.12:1);
-    scene=new B.Scene(engine);scene.clearColor=new B.Color4(.07,.09,.13,1);scene.fogMode=B.Scene.FOGMODE_EXP2;scene.fogDensity=.0057;scene.fogColor=B.Color3.FromHexString('#5f6871');
+    engine.setHardwareScalingLevel(mobile?1.00:.9);
+    scene=new B.Scene(engine);scene.clearColor=new B.Color4(.07,.09,.13,1);scene.fogMode=B.Scene.FOGMODE_EXP2;scene.fogDensity=.0038;scene.fogColor=B.Color3.FromHexString('#5f6871');
     scene.imageProcessingConfiguration.toneMappingEnabled=true;
     scene.imageProcessingConfiguration.toneMappingType=B.ImageProcessingConfiguration.TONEMAPPING_ACES;
     scene.imageProcessingConfiguration.exposure=1.08;scene.imageProcessingConfiguration.contrast=1.24;
     cam=new B.UniversalCamera('first-person camera',V(-1,1.72,27),scene);
-    cam.minZ=.08;cam.maxZ=380;cam.fov=mobile?1.33:1.17;cam.rotation.y=Math.PI;scene.activeCamera=cam;
+    cam.minZ=.08;cam.maxZ=850;cam.fov=mobile?1.33:1.17;cam.rotation.y=Math.PI;scene.activeCamera=cam;
     ambient=new B.HemisphericLight('sky light',V(.15,1,.05),scene);ambient.intensity=.69;ambient.diffuse=B.Color3.FromHexString('#a1adbc');ambient.groundColor=B.Color3.FromHexString('#393e3e');
     sun=new B.DirectionalLight('dying sunlight',V(-.45,-.94,-.28),scene);sun.intensity=1.28;sun.diffuse=B.Color3.FromHexString('#d5bca2');sun.position=V(35,82,40);
     let shadows=null;try{shadows=new B.ShadowGenerator(mobile?512:1024,sun);shadows.useBlurExponentialShadowMap=true;shadows.blurKernel=mobile?2:4;}catch(e){}
     const skyMat=new B.StandardMaterial('gradient sky',scene);skyMat.disableLighting=true;skyMat.backFaceCulling=false;skyMat.emissiveColor=new B.Color3(1,1,1);skyMat.diffuseColor=new B.Color3(0,0,0);
     const st=new B.DynamicTexture('winter sky',{width:1024,height:512},scene,false);let ctx=st.getContext();let grad=ctx.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#101828');grad.addColorStop(.48,'#5a6570');grad.addColorStop(.78,'#9a7e76');grad.addColorStop(1,'#bba39b');ctx.fillStyle=grad;ctx.fillRect(0,0,1024,512);for(let i=0;i<110;i++){const a=rand(i,100)*1024,b=rand(i,400)*135;ctx.fillStyle=`rgba(255,251,234,${.15+rand(i,50)*.38})`;ctx.fillRect(a,b,1.25,1.25)}st.update(false);skyMat.emissiveTexture=st;
-    sky=B.MeshBuilder.CreateSphere('weathered sky dome',{diameter:720,segments:24,sideOrientation:B.Mesh.BACKSIDE},scene);sky.material=skyMat;sky.infiniteDistance=true;sky.isPickable=false;sky.applyFog=false;
-    setupCinematic();stoneGround();forest();const mats=architecture();
+    sky=B.MeshBuilder.CreateSphere('weathered sky dome',{diameter:1150,segments:24,sideOrientation:B.Mesh.BACKSIDE},scene);sky.material=skyMat;sky.infiniteDistance=true;sky.isPickable=false;sky.applyFog=false;
+    setupCinematic();stoneGround();forest();const mats=architecture();worldExpansion();
     for(const [x,z] of [[-11,13],[11,13],[-20,-27],[20,-27]])lantern(x,z);
     glints();
     for(let i=0;i<3;i++){let x=[-11,8,17][i],z=[-13,15,-23][i];const block=box('movable ancient stone chest',1.3,1.1,1.2,x,.56,z,mats.edge);block.rotation.y=rand(i,55)*.2;let strip=box('bronze inlay chest',1.34,.09,1.24,x,.76,z,mats.iron);strip.parent=block;strip.position.set(0,.12,0);
@@ -316,21 +496,26 @@
   }
   function updateHUD(){ $('hpNum').textContent=Math.round(game.hp);$('hpBar').style.width=game.hp+'%';$('manaBar').style.width=game.mana+'%';$('enemyBar').style.width=(Math.max(0,enemy.hp)/5*100)+'%';
     $('enemyCard').classList.toggle('hidden',!enemy.alive||distance(cam.position.x,cam.position.z,enemy.x,enemy.z)>26);
-    $('objective').textContent=enemy.alive?'Sconfiggi il Custode dell’Ombra (✦ Stupeficium)':'Cerca la porta sigillata. Revelio la rivela, E la apre.';
+    $('objective').textContent=enemy.alive?'Sconfiggi il Custode dell’Ombra (Stupeficium). Il mondo oltre il cortile è già esplorabile.':
+      !game.revealed?'Usa Revelio sul portale. Oppure esplora Hogsmeade e la Foresta Proibita.':
+      !world.portalUnsealed?'Apri il portale con ✋ oppure scopri il treno alla stazione.':
+      'Esplora la valle: Hogsmeade, Foresta Proibita, Lago Nero e Hogwarts Express.';
   }
   function win(){game.ended=true;game.running=false;$('hud').classList.add('hidden');$('finished').classList.remove('hidden');$('finishTag').textContent='CAPITOLO I · COMPLETATO';$('finishTitle').textContent='La porta si è aperta';$('finishText').textContent='Il Custode è stato sconfitto e il primo segreto di Hogwarts è nelle tue mani. Questo è solo l’inizio del nuovo Alohomora.';audio(780,.9);}
   function lose(){game.ended=true;game.running=false;$('hud').classList.add('hidden');$('finished').classList.remove('hidden');$('finishTag').textContent='IL CORTILE È CADUTO';$('finishTitle').textContent='La notte prevale';$('finishText').textContent='Il Custode ti ha sopraffatto. Torna nel cortile, cambia incantesimi e usa Protego per deviare i suoi attacchi.';}
   const inputs={keys:new Set(),axisX:0,axisY:0,joyId:null,lookId:null,px:0,py:0};
-  function reset(){for(const p of projectiles)deleteProjectile(p);projectiles.length=0;game.hp=100;game.mana=100;game.shield=0;game.lumos=false;game.revealed=false;game.ended=false;game.vx=game.vz=game.vy=game.airborne=0;game.yaw=Math.PI;game.pitch=0;game.running=true;game.spell=0;game.pulse=0;game.bob=0;game.shake=0;cinematic.flash=0;enemy.hp=5;enemy.alive=true;enemy.death=0;enemy.mode='idle';enemy.stun=0;enemy.windup=0;enemy.cool=3;enemy.x=6;enemy.z=-8;enemy.root.position.set(6,0,-8);enemy.root.rotation.set(0,0,0);enemy.root.setEnabled(true);if(enemy.modelReady)playEnemyAnim('Idle');for(const p of props){p.x=p.homeX;p.z=p.homeZ;p.y=.56;p.mesh.position.set(p.x,p.y,p.z);p.vx=p.vy=p.vz=0;}
+  function reset(){try{const saved=JSON.parse(localStorage.getItem('alohomora-world-v12')||'null');if(saved){world.time=saved.time||world.time;world.villageVisited=!!saved.quests?.village;world.forestVisited=!!saved.quests?.forest;world.stationVisited=!!saved.quests?.station;}}catch(e){}
+    world.onTrain=false;world.lastZone='';world.dialogues=0;for(const a of world.actors){a.x=a.homeX;a.z=a.homeZ;a.alive=true;a.hp=a.kind==='shade'?3:999;a.root.setEnabled(true);a.stun=0;}
+    for(const p of projectiles)deleteProjectile(p);projectiles.length=0;game.hp=100;game.mana=100;game.shield=0;game.lumos=false;game.revealed=false;game.ended=false;game.vx=game.vz=game.vy=game.airborne=0;game.yaw=Math.PI;game.pitch=0;game.running=true;game.spell=0;game.pulse=0;game.bob=0;game.shake=0;cinematic.flash=0;enemy.hp=5;enemy.alive=true;enemy.death=0;enemy.mode='idle';enemy.stun=0;enemy.windup=0;enemy.cool=3;enemy.x=6;enemy.z=-8;enemy.root.position.set(6,0,-8);enemy.root.rotation.set(0,0,0);enemy.root.setEnabled(true);if(enemy.modelReady)playEnemyAnim('Idle');for(const p of props){p.x=p.homeX;p.z=p.homeZ;p.y=.56;p.mesh.position.set(p.x,p.y,p.z);p.vx=p.vy=p.vz=0;}
     cam.position.set(-1,1.72,27);cam.rotation.set(0,Math.PI,0);portalCore.setEnabled(false);game.sealRing.setEnabled(false);wandLight.intensity=0;
     $('intro').classList.add('hidden');$('finished').classList.add('hidden');$('hud').classList.remove('hidden');$('interact').classList.add('hidden');
     selectSpell(0);updateHUD();toast('Attraversa il cortile e preparati al duello',4);
   }
   function selectSpell(i){game.spell=clamp(i,0,spells.length-1);document.querySelectorAll('.spell').forEach((el,j)=>el.classList.toggle('selected',j===game.spell));audio(350+game.spell*100,.08,'sine',.014);}
   function movePlayer(dt){const yaw=game.yaw,axisX=inputs.axisX+(inputs.keys.has('d')||inputs.keys.has('arrowright')?1:0)-(inputs.keys.has('a')||inputs.keys.has('arrowleft')?1:0),axisY=inputs.axisY+(inputs.keys.has('w')||inputs.keys.has('arrowup')?1:0)-(inputs.keys.has('s')||inputs.keys.has('arrowdown')?1:0);
-    const l=Math.max(1,Math.hypot(axisX,axisY)),sx=axisX/l,sy=axisY/l;const desiredX=(-Math.cos(yaw)*sx+Math.sin(yaw)*sy)*4.8,desiredZ=(Math.sin(yaw)*sx+Math.cos(yaw)*sy)*4.8;
+    const l=Math.max(1,Math.hypot(axisX,axisY)),sx=axisX/l,sy=axisY/l;const desiredX=(-Math.cos(yaw)*sx+Math.sin(yaw)*sy)*(inputs.keys.has('shift')?8.2:4.8),desiredZ=(Math.sin(yaw)*sx+Math.cos(yaw)*sy)*(inputs.keys.has('shift')?8.2:4.8);
     game.vx=mix(game.vx,desiredX,Math.min(1,dt*8));game.vz=mix(game.vz,desiredZ,Math.min(1,dt*8));
-    const test=(x,z)=>{if(x< -91||x>91||z>88||z<-91)return false;for(const r of colliders){if(Math.abs(x-r.x)<r.w/2+.64&&Math.abs(z-r.z)<r.d/2+.64)return false}return true};
+    const test=(x,z)=>{if(x< -246||x>246||z>246||z<-246)return false;for(const r of colliders){if(Math.abs(x-r.x)<r.w/2+.64&&Math.abs(z-r.z)<r.d/2+.64)return false}return true};
     let nx=cam.position.x+game.vx*dt,nz=cam.position.z+game.vz*dt;
     if(test(nx,cam.position.z))cam.position.x=nx;else game.vx=0;
     if(test(cam.position.x,nz))cam.position.z=nz;else game.vz=0;
@@ -382,6 +567,10 @@
           magicImpact(V(enemy.x,2,enemy.z),'#f2ca8c',1.9);updateHUD();
           toast('Il sigillo del portale si è indebolito. Usa Revelio.',4);}
       }
+      if(!p.hostile&&p.life>0){for(const a of world.actors){if(a.kind!=='shade'||!a.alive)continue;
+        if(B.Vector3.Distance(pos,V(a.x,2,a.z))<1.55){a.hp--;a.stun=.7;magicImpact(pos,'#ae7896',1.1);p.life=0;
+          if(a.hp<=0){a.alive=false;game.kills++;toast('Una creatura d’ombra è stata sconfitta',2.1);}
+          break;}}}
       if(pos.y<.20&&p.life>0){magicImpact(V(pos.x,.24,pos.z),p.hostile?'#ba4260':'#e88364',.68);p.life=0;}
       if(p.life<=0||Math.abs(pos.x)>110||Math.abs(pos.z)>110){deleteProjectile(p);projectiles.splice(i,1);}
     }}
@@ -397,18 +586,36 @@
     }}
   function updatePortal(dt){if(!portalCore)return;if(game.revealed){portalCore.rotation.z+=dt*.15;portalCore.scaling.x=1+Math.sin(phase*1.9)*.12;portalCore.scaling.y=1+Math.cos(phase*1.7)*.12;game.sealRing.rotation.y+=dt*.13;}
     const near=distance(cam.position.x,cam.position.z,0,-39.2)<7.0;
-    $('interact').classList.toggle('hidden',!(near&&game.running&&!enemy.alive));
+    // Interaction prompt is managed by the nearby-NPC and train system.
   }
-  function interact(){if(!game.running)return;if(distance(cam.position.x,cam.position.z,0,-39.2)>7){toast('Nulla da esaminare qui');return;}
+  function interact(){if(!game.running)return;
+    if(world.onTrain){world.onTrain=false;cam.position.x=129;cam.position.z=world.train.z;cam.position.y=1.72;toast('Sei sceso dall’Espresso.');return;}
+    const nearby=nearestActor();if(nearby){nearby.interacted=true;world.dialogues++;
+      const reply=nearby.kind==='student'&&world.time>.75?'La ronda notturna è vicina. Non restare nelle ombre.':
+        nearby.name.includes('Capostazione')&&world.train?'La locomotiva si trova '+Math.round(Math.abs(world.train.z-cam.position.z))+' passi lungo la ferrovia.':
+        nearby.name.includes('guaritrice')?'Riprendi le forze, viandante. La tua salute è stata curata.':nearby.line;
+      toast(nearby.name+': '+reply,5);magicAudio('revelio');
+      if(nearby.name.includes('guaritrice'))game.hp=Math.min(100,game.hp+30);
+      if(nearby.region==='Hogsmeade')world.villageVisited=true;
+      if(nearby.region==='Foresta')world.forestVisited=true;
+      if(nearby.region==='Stazione')world.stationVisited=true;
+      saveWorld();return;}
+    if(world.train&&distance(cam.position.x,cam.position.z,145,world.train.z)<8){world.onTrain=true;world.trainSeatZ=0;toast('🚂 Hogwarts Express · viaggio nella valle! Tocca ✋ per scendere.',5);world.stationVisited=true;saveWorld();return;}
+    if(distance(cam.position.x,cam.position.z,0,-39.2)>7){toast('Avvicinati a un personaggio, a una porta o al treno.');return;}
+
     if(enemy.alive){toast('Un incantesimo antico protegge la porta. Sconfiggi il Custode.');return;}
     if(!game.revealed){toast('Il portale è nascosto. Lancia Revelio.');return;}
-    burst(V(0,5.0,-44), '#e8cb90',75,5);win();}
+    burst(V(0,5.0,-44), '#e8cb90',75,5);world.portalUnsealed=true;
+    toast('✦ Il portale è aperto! Il mondo magico oltre Hogwarts ti attende.',6);world.villageVisited=true;saveWorld();
+    game.hp=Math.min(100,game.hp+40);game.mana=100;game.xp+=250;
+    // Reward continuous exploration instead of closing the game after the first mission.
+  }
   function tick(){const now=performance.now(),dt=clamp((now-last)/1000,.001,.042);last=now;phase+=dt;effectClock+=dt;
     sky.position.copyFrom(cam.position);
     for(const torch of game.torches)torch.light.intensity=(mobile?.55:.78)+Math.sin(phase*10+torch.phase)*.10+Math.sin(phase*3.3+torch.phase)*.07;
-    if(game.running){movePlayer(dt);updateEnemy(dt);updateProps(dt);updateProjectiles(dt);game.mana=Math.min(100,game.mana+dt*7.6);game.shield=Math.max(0,game.shield-dt);game.pulse=Math.max(0,game.pulse-dt);updatePortal(dt);if(game.toastTimeout>0){game.toastTimeout-=dt;if(game.toastTimeout<=0)$('toast').classList.remove('show');}}
+    if(game.running){if(!world.onTrain)movePlayer(dt);updateEnemy(dt);updateProps(dt);updateProjectiles(dt);game.mana=Math.min(100,game.mana+dt*7.6);game.shield=Math.max(0,game.shield-dt);game.pulse=Math.max(0,game.pulse-dt);updatePortal(dt);if(game.toastTimeout>0){game.toastTimeout-=dt;if(game.toastTimeout<=0)$('toast').classList.remove('show');}}
     else{if(!game.ended){cam.rotation.y=Math.PI+Math.sin(phase*.20)*.045;cam.rotation.x=-.025;}updateEnemy(dt)}
-    updateEffects(dt);updateCinematic(dt);if(game.running&&effectClock>.1){updateHUD();effectClock=0;}
+    updateEffects(dt);updateCinematic(dt);updateLivingWorld(dt);if(game.running&&effectClock>.1){updateHUD();effectClock=0;}
     scene.render();}
   function jump(){if(!game.running)return;if(game.airborne<.02&&game.vy<=0){game.vy=6.5;audio(220,.1)}}
   function controls(){const joy=$('joy'),knob=$('knob');function handleJoy(e){let r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,radius=34,mag=Math.max(1,Math.hypot(dx,dy)),k=Math.min(1,mag/radius),a=Math.atan2(dy,dx);inputs.axisX=Math.cos(a)*k;inputs.axisY=-Math.sin(a)*k;knob.style.transform=`translate(${Math.cos(a)*radius*k}px,${Math.sin(a)*radius*k}px)`;}
@@ -421,18 +628,32 @@
     canvas.addEventListener('click',()=>{if(game.running&&!mobile&&document.pointerLockElement!==canvas){canvas.requestPointerLock?.()}});
     document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&game.running){game.yaw+=e.movementX*.0024;game.pitch=clamp(game.pitch+e.movementY*.0023,-.8,.65);}});
     document.addEventListener('mousedown',e=>{if(document.pointerLockElement===canvas&&e.button===0)cast();});
-    document.addEventListener('keydown',e=>{let key=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(key))e.preventDefault();inputs.keys.add(key);if(!game.running)return;if(key==='e')interact();if(key===' ')jump();if(key>='1'&&key<='5')selectSpell(Number(key)-1);if(key==='q')selectSpell((game.spell+4)%5);if(key==='f')cast();});
+    document.addEventListener('keydown',e=>{let key=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(key))e.preventDefault();inputs.keys.add(key);if(!game.running)return;if(key==='e')interact();if(key===' ')jump();if(key>='1'&&key<='5')selectSpell(Number(key)-1);if(key==='q')selectSpell((game.spell+4)%5);if(key==='f')cast();if(key==='m')$('mapPanel')?.classList.toggle('hidden');});
     document.addEventListener('keyup',e=>inputs.keys.delete(e.key.toLowerCase()));
     document.querySelectorAll('.spell').forEach((b,i)=>b.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();selectSpell(i)}));
     $('cast').addEventListener('pointerdown',e=>{e.preventDefault();cast()});$('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
     $('interact').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
+    $('mapToggle')?.addEventListener('click',()=>{$('mapPanel')?.classList.toggle('hidden');});
+    $('mapClose')?.addEventListener('click',()=>{$('mapPanel')?.classList.add('hidden');});
+    $('graphicToggle')?.addEventListener('click',()=>{const hi=engine.getHardwareScalingLevel()>1.05;
+      engine.setHardwareScalingLevel(hi?mobile?.88:.76:mobile?1.30:1.14);
+      if(cinematic.pipeline)cinematic.pipeline.bloomEnabled=hi;
+      $('graphicToggle').textContent=hi?'GRAFICA: CINEMA':'GRAFICA: FLUIDA';
+      engine.resize();});
     $('start').addEventListener('click',()=>{if(!scene){error('Il motore grafico non è pronto. Ricarica la pagina.');return;}try{const AC=window.AudioContext||window.webkitAudioContext;if(AC&&!game.audio)game.audio=new AC();game.audio?.resume?.();reset();}catch(ex){error('Avvio interrotto: '+ex.message)}});
     $('restart').addEventListener('click',reset);window.addEventListener('resize',()=>engine?.resize());window.addEventListener('orientationchange',()=>setTimeout(()=>engine?.resize(),220));
     document.addEventListener('visibilitychange',()=>{last=performance.now();inputs.keys.clear();inputs.axisX=inputs.axisY=0;knob.style.transform='translate(0,0)';});
     document.addEventListener('contextmenu',e=>e.preventDefault());
   }
+  async function checkForUpdate(){try{const r=await fetch('./version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
+    const v=await r.json();if(v.version&&v.version!=='1.2.0'){
+      const btn=$('updateBanner');if(btn){btn.classList.remove('hidden');btn.textContent='✦ Nuovo Alohomora '+v.version+' disponibile · Tocca per aggiornare';}
+    }}catch(e){}}
   function boot(){if(!B){error('Impossibile caricare Babylon.js. Verifica la connessione Internet e ricarica.');return;}
-    try{sceneSetup();controls();last=performance.now();engine.runRenderLoop(tick);$('load').textContent='Mondo pronto · premi Entra nel mondo magico';}
+    try{sceneSetup();controls();
+      $('updateBanner')?.addEventListener('click',()=>location.reload());
+      checkForUpdate();setInterval(checkForUpdate,15*60*1000);
+      last=performance.now();engine.runRenderLoop(tick);$('load').textContent='Mondo pronto · premi Entra nel mondo magico';}
     catch(e){console.error(e);error('Errore nella scena 3D: '+e.message);}
   }
   window.addEventListener('error',e=>{if(!$('intro').classList.contains('hidden')){error('Il caricamento è stato interrotto: '+e.message)}});
