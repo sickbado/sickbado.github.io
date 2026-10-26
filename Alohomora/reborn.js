@@ -1,4 +1,4 @@
-/* ALOHOMORA · REBORN, Chapter I — experimental mobile 3D vertical slice.
+/* ALOHOMORA · REBORN 1.1 — Cinematic Magic, Chapter I — mobile 3D vertical slice.
  * Rendering: Babylon.js, animations: GLB (optional) + procedural fallback.
  * Character source: three.js examples Soldier.glb (MIT sample). Geometry/textures
  * created here are original; 3D asset is optional and loaded separately.
@@ -20,6 +20,10 @@
     {name:'Revelio',cost:14,color:'#b4a6eb'}
   ];
   const projectiles=[], fx=[], props=[], colliders=[];
+  const cinematic={pipeline:null,particleTexture:null,shield:null,shieldMat:null,shieldRing:null,shieldLight:null,lamp:null,
+    flash:0,flashColor:'#e27054',shake:0,revelioWaves:[],perfTime:0,perfSamples:0,qualityReduced:false};
+  const effectiveCount=(n)=>mobile?Math.min(45,Math.round(n*.56)):n;
+
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
   const mix=(a,b,f)=>a+(b-a)*f;
   const distance=(a,b,c,d)=>Math.hypot(a-c,b-d);
@@ -28,6 +32,104 @@
   function error(message){const e=$('error');e.textContent=message;e.style.display='block';$('load').textContent='Problema tecnico · '+message;}
   function toast(message,seconds=2.7){$('toast').textContent=message;$('toast').classList.add('show');game.toastTimeout=seconds;}
   function audio(freq=330,duration=.19,mode='sine',volume=.038){try{const c=game.audio;if(!c)return;const osc=c.createOscillator(),gain=c.createGain(),t=c.currentTime;osc.type=mode;osc.frequency.setValueAtTime(freq,t);osc.frequency.exponentialRampToValueAtTime(Math.max(45,freq*.56),t+duration);gain.gain.setValueAtTime(volume,t);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);osc.connect(gain).connect(c.destination);osc.start();osc.stop(t+duration+.02)}catch(e){}}
+  function magicAudio(kind){
+    const c=game.audio;if(!c)return;try{
+      const t=c.currentTime,config={cast:[145,.37,.065],impact:[88,.26,.092],shield:[335,.47,.05],lumos:[570,.72,.024],revelio:[195,.86,.040],accio:[260,.46,.042]}[kind]||[250,.24,.035];
+      const [f,d,v]=config;const carrier=c.createOscillator(),shimmer=c.createOscillator(),gain=c.createGain(),filter=c.createBiquadFilter();
+      carrier.type=kind==='impact'?'sawtooth':'triangle';shimmer.type='sine';filter.type='lowpass';filter.frequency.setValueAtTime(kind==='impact'?1800:2500,t);
+      carrier.frequency.setValueAtTime(f,t);carrier.frequency.exponentialRampToValueAtTime(f*(kind==='cast'?3.6:kind==='revelio'?2.8:.58),t+d);
+      shimmer.frequency.setValueAtTime(f*2.9,t);shimmer.frequency.exponentialRampToValueAtTime(f*.91,t+d);
+      gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(v,t+.035);gain.gain.exponentialRampToValueAtTime(.0001,t+d);
+      carrier.connect(filter);shimmer.connect(filter);filter.connect(gain);gain.connect(c.destination);
+      carrier.start(t);shimmer.start(t);carrier.stop(t+d+.03);shimmer.stop(t+d+.03);
+    }catch(e){}
+  }
+  function flash(color='#e47568',strength=.27){cinematic.flash=Math.min(.72,strength);cinematic.flashColor=color;cinematic.shake=Math.max(cinematic.shake,strength*.10);}
+  function magicParticleTexture(){
+    if(cinematic.particleTexture)return cinematic.particleTexture;
+    const t=new B.DynamicTexture('soft spell particle',{width:64,height:64},scene,false);
+    const c=t.getContext(),g=c.createRadialGradient(32,32,1,32,32,32);
+    g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.17,'rgba(255,255,255,.96)');
+    g.addColorStop(.42,'rgba(255,255,255,.38)');g.addColorStop(1,'rgba(255,255,255,0)');
+    c.clearRect(0,0,64,64);c.fillStyle=g;c.fillRect(0,0,64,64);t.hasAlpha=true;t.update(false);
+    cinematic.particleTexture=t;return t;
+  }
+  function particleBurst(at,hex,count=45,power=2.8){
+    if(!scene)return;
+    const ps=new B.ParticleSystem('impact sparks',Math.max(12,effectiveCount(count)),scene);
+    ps.particleTexture=magicParticleTexture();ps.emitter=at.clone();
+    const tint=B.Color3.FromHexString(hex);
+    ps.color1=new B.Color4(tint.r,tint.g,tint.b,1);ps.color2=new B.Color4(Math.min(1,tint.r*1.35),Math.min(1,tint.g*1.3),Math.min(1,tint.b*1.25),.92);ps.colorDead=new B.Color4(tint.r*.24,tint.g*.24,tint.b*.24,0);
+    ps.minSize=.055;ps.maxSize=.25;ps.minLifeTime=.22;ps.maxLifeTime=.76;
+    ps.minEmitPower=power*.35;ps.maxEmitPower=power*1.55;
+    ps.direction1=V(-1,-.20,-1);ps.direction2=V(1,1.1,1);ps.gravity=V(0,-3,0);
+    ps.manualEmitCount=effectiveCount(count);ps.emitRate=0;ps.blendMode=B.ParticleSystem.BLENDMODE_ONEONE;
+    ps.start();setTimeout(()=>{ps.stop();setTimeout(()=>ps.dispose(),1000)},150);
+  }
+  function magicImpact(at,hex,scale=1){
+    particleBurst(at,hex,scale>1?75:40,2.5*scale);flash(hex,Math.min(.4,.18*scale));magicAudio('impact');
+    const m=glowy(hex);m.alpha=.55;m.transparencyMode=B.Material.MATERIAL_ALPHABLEND;m.backFaceCulling=false;
+    const r=B.MeshBuilder.CreateTorus('expanding magic ring',{diameter:.35,thickness:.055,tessellation:32},scene);
+    r.material=m;r.position.copyFrom(at);r.rotation.x=Math.PI/2;
+    const light=new B.PointLight('impact illumination',at.clone(),scene);light.diffuse=B.Color3.FromHexString(hex);light.intensity=mobile?.65:1.6;light.range=scale>1?9:6;
+    fx.push({kind:'shock',mesh:r,mat:m,light,life:.36,total:.36,scale});
+  }
+  function magicWave(at,hex,diameter=1,speed=7){
+    const m=glowy(hex);m.alpha=.56;m.transparencyMode=B.Material.MATERIAL_ALPHABLEND;m.backFaceCulling=false;
+    const r=B.MeshBuilder.CreateTorus('revelio expanding rune',{diameter,thickness:.09,tessellation:64},scene);
+    r.position.copyFrom(at);r.rotation.x=Math.PI/2;r.material=m;
+    fx.push({kind:'wave',mesh:r,mat:m,life:1.55,total:1.55,speed});
+    particleBurst(at,hex,70,1.25);
+  }
+  function setupCinematic(){
+    magicParticleTexture();
+    try{
+      const pipe=new B.DefaultRenderingPipeline('cinematic magic',true,scene,[cam]);
+      pipe.samples=1;pipe.fxaaEnabled=!mobile;pipe.bloomEnabled=true;
+      pipe.bloomThreshold=.69;pipe.bloomWeight=mobile?.23:.33;pipe.bloomKernel=mobile?32:64;pipe.bloomScale=.5;
+      cinematic.pipeline=pipe;
+    }catch(e){console.warn('Bloom non disponibile, render di riserva attivo:',e.message);}
+  }
+  function setupProtego(){
+    const m=glowy('#4baccd');m.alpha=.12;m.backFaceCulling=false;
+    m.transparencyMode=B.Material.MATERIAL_ALPHABLEND;m.disableDepthWrite=true;
+    const dome=B.MeshBuilder.CreateSphere('Protego translucent arc',{diameter:2.55,segments:18},scene);
+    dome.parent=cam;dome.position.set(0,-.06,1.75);dome.scaling.set(1.24,1.04,.67);dome.material=m;dome.isPickable=false;dome.setEnabled(false);
+    const rim=glowy('#8dcde6');rim.alpha=.44;rim.transparencyMode=B.Material.MATERIAL_ALPHABLEND;
+    const ring=B.MeshBuilder.CreateTorus('Protego sigil border',{diameter:2.45,thickness:.029,tessellation:48},scene);
+    ring.parent=dome;ring.rotation.x=Math.PI/2;ring.material=rim;
+    cinematic.shield=dome;cinematic.shieldMat=m;cinematic.shieldRing=ring;
+    const light=new B.PointLight('Protego defensive light',V(0,0,2),scene);light.parent=cam;light.diffuse=B.Color3.FromHexString('#5faaca');light.intensity=0;light.range=6;cinematic.shieldLight=light;
+  }
+  function newTrail(host,hex){
+    const ps=new B.ParticleSystem('fast spell comet trail',mobile?64:160,scene);ps.particleTexture=magicParticleTexture();ps.emitter=host;
+    const c=B.Color3.FromHexString(hex);ps.color1=new B.Color4(c.r,c.g,c.b,.94);ps.color2=new B.Color4(c.r,Math.min(1,c.g*1.35),Math.min(1,c.b*1.2),.52);
+    ps.colorDead=new B.Color4(c.r*.5,c.g*.2,c.b*.3,0);
+    ps.minSize=.09;ps.maxSize=mobile?.24:.34;ps.minLifeTime=.12;ps.maxLifeTime=.36;
+    ps.emitRate=mobile?95:185;ps.minEmitPower=.03;ps.maxEmitPower=.5;ps.direction1=V(-.4,-.3,-.4);ps.direction2=V(.4,.3,.4);ps.blendMode=B.ParticleSystem.BLENDMODE_ONEONE;ps.start();return ps;
+  }
+  function deleteProjectile(p){p.trail?.stop();p.trail?.dispose();p.mesh.dispose();p.light.dispose();}
+  function updateCinematic(dt){
+    if(cinematic.flash>0){cinematic.flash=Math.max(0,cinematic.flash-dt*1.9);const el=$('magicFlash');if(el){el.style.background=`radial-gradient(ellipse at 52% 51%,transparent 12%,${cinematic.flashColor}75 130%)`;el.style.opacity=String(cinemaClamp(cinematic.flash*.85));}}
+    else if($('magicFlash'))$('magicFlash').style.opacity='0';
+    cinematic.shake=Math.max(0,cinematic.shake-dt*.5);
+    if(cinematic.shield){const enabled=game.running&&game.shield>0;cinematic.shield.setEnabled(enabled);
+      if(enabled){const pulse=.10+.038*Math.sin(phase*13);cinematic.shieldMat.alpha=pulse;cinematic.shield.rotation.y+=dt*.3;
+        cinematic.shieldRing.scaling.setAll(1+.032*Math.sin(phase*8));cinematic.shieldLight.intensity=.55+.23*Math.sin(phase*12);}
+      else cinematic.shieldLight.intensity=0;
+    }
+    if(cinematic.lamp){cinematic.lamp.setEnabled(!!game.lumos&&game.running);cinematic.lamp.scaling.setAll(.80+.14*Math.sin(phase*4));}
+    if(game.lumos&&game.running)wandLight.intensity=2.6+.23*Math.sin(phase*7);
+    if(game.running&&cinematic.shake>.002){cam.rotation.y+=(Math.sin(phase*65)*cinematic.shake*.03);cam.rotation.x+=(Math.cos(phase*47)*cinematic.shake*.03);}
+    cinematic.perfTime+=dt;cinematic.perfSamples++;
+    if(mobile&&!cinematic.qualityReduced&&cinematic.perfTime>9){
+      const fps=engine.getFps();if(fps>0&&fps<23){cinematic.qualityReduced=true;
+        if(cinematic.pipeline)cinematic.pipeline.bloomEnabled=false;
+        engine.setHardwareScalingLevel(1.35);console.info('Alohomora: mode mobile adattivo attivato',fps);}
+      cinematic.perfTime=0;
+    }
+  }
+  function cinemaClamp(v){return Math.max(0,Math.min(.72,v));}
   function material(name,rgb,opt={}){const m=new B.StandardMaterial(name,scene);m.diffuseColor=B.Color3.FromHexString(rgb);m.specularColor=B.Color3.FromHexString(opt.spec||'#171819');m.specularPower=opt.shine||22;if(opt.emissive)m.emissiveColor=B.Color3.FromHexString(opt.emissive);if(opt.alpha!==undefined){m.alpha=opt.alpha; if(opt.alpha<1){m.transparencyMode=B.Material.MATERIAL_ALPHABLEND;m.needDepthPrePass=true}}if(opt.back)m.backFaceCulling=false;return m;}
   function noiseTexture(name,baseA,baseB,kind='grass'){
     const tex = new B.DynamicTexture(name,{width:512,height:512},scene,false,B.Texture.TRILINEAR_SAMPLINGMODE);const ctx=tex.getContext();
@@ -149,7 +251,7 @@
     const skyMat=new B.StandardMaterial('gradient sky',scene);skyMat.disableLighting=true;skyMat.backFaceCulling=false;skyMat.emissiveColor=new B.Color3(1,1,1);skyMat.diffuseColor=new B.Color3(0,0,0);
     const st=new B.DynamicTexture('winter sky',{width:1024,height:512},scene,false);let ctx=st.getContext();let grad=ctx.createLinearGradient(0,0,0,512);grad.addColorStop(0,'#101828');grad.addColorStop(.48,'#5a6570');grad.addColorStop(.78,'#9a7e76');grad.addColorStop(1,'#bba39b');ctx.fillStyle=grad;ctx.fillRect(0,0,1024,512);for(let i=0;i<110;i++){const a=rand(i,100)*1024,b=rand(i,400)*135;ctx.fillStyle=`rgba(255,251,234,${.15+rand(i,50)*.38})`;ctx.fillRect(a,b,1.25,1.25)}st.update(false);skyMat.emissiveTexture=st;
     sky=B.MeshBuilder.CreateSphere('weathered sky dome',{diameter:720,segments:24,sideOrientation:B.Mesh.BACKSIDE},scene);sky.material=skyMat;sky.infiniteDistance=true;sky.isPickable=false;sky.applyFog=false;
-    stoneGround();forest();const mats=architecture();
+    setupCinematic();stoneGround();forest();const mats=architecture();
     for(const [x,z] of [[-11,13],[11,13],[-20,-27],[20,-27]])lantern(x,z);
     glints();
     for(let i=0;i<3;i++){let x=[-11,8,17][i],z=[-13,15,-23][i];const block=box('movable ancient stone chest',1.3,1.1,1.2,x,.56,z,mats.edge);block.rotation.y=rand(i,55)*.2;let strip=box('bronze inlay chest',1.34,.09,1.24,x,.76,z,mats.iron);strip.parent=block;strip.position.set(0,.12,0);
@@ -165,6 +267,9 @@
     const glove=sphere('sleeved spellcasting hand',.31,0,0,0,hand,10);glove.parent=cam;glove.position.set(.60,-.62,.9);glove.scaling.set(.84,.62,1.6);
     wandLight=new B.PointLight('wand lumos',V(.47,-.05,1.1),scene);wandLight.parent=cam;wandLight.intensity=0;wandLight.range=16;wandLight.diffuse=B.Color3.FromHexString('#ffd594');
     game.wand=staff;game.shadow=shadows;
+    const glow=glowy('#ffcb86');const lamp=sphere('Lumos luminous tip',.14,0,.39,0,glow,12);
+    lamp.parent=staff;lamp.setEnabled(false);cinematic.lamp=lamp;
+    setupProtego();
     B.Engine.LastCreatedEngine?.hideLoadingUI?.();
     return scene;
   }
@@ -195,18 +300,18 @@
   }catch(e){$('load').textContent='Mondo pronto · nemico procedurale di riserva';console.info('Optional animated character failed',e.message);}}
   function playEnemyAnim(name){if(!enemy.anims.length||enemy.current===name)return;enemy.current=name;for(const g of enemy.anims)g.stop();let match=enemy.anims.find(g=>g.name.toLowerCase()===name.toLowerCase())||enemy.anims.find(g=>g.name.toLowerCase().includes(name.toLowerCase()));if(match)match.start(true,1,match.from,match.to,false);}
   function glowy(hex){const m=new B.StandardMaterial('magical aura',scene);m.diffuseColor=B.Color3.FromHexString(hex);m.emissiveColor=m.diffuseColor.clone();m.disableLighting=true;return m;}
-  function burst(pos,color,count=15,force=2.2){const m=glowy(color);for(let i=0;i<count;i++){let a=i*2.399+rand(i,phase),c=rand(i,4)*2-1,v=Math.sqrt(1-c*c)*force;let p=sphere('spell sparks',.085+rand(i,7)*.12,pos.x,pos.y,pos.z,m,6);fx.push({kind:'spark',mesh:p,life:.44+rand(i,9)*.6,vx:Math.cos(a)*v,vy:c*force+1,vz:Math.sin(a)*v});}}
-  function spawnBolt(from,target,hostile){const c=hostile?'#b92f48':'#ef755d',mat=glowy(c);const orb=sphere(hostile?'hostile hex':'your spell',hostile?.42:.33,from.x,from.y,from.z,mat,12);const dir=target.subtract(from).normalize();const point=new B.PointLight('spell light',orb.position.clone(),scene);point.diffuse=B.Color3.FromHexString(c);point.intensity=hostile?.7:1.0;point.range=4.3;
-    projectiles.push({mesh:orb,light:point,dir,hostile,speed:hostile?12:27,life:hostile?2.4:1.25});
-    audio(hostile?230:680,.17,'sawtooth',.034);
+  function burst(pos,color,count=15,force=2.2){particleBurst(pos,color,count,force);}
+  function spawnBolt(from,target,hostile){const c=hostile?'#b92f48':'#ef755d',mat=glowy(c);const orb=sphere(hostile?'hostile hex':'your spell',hostile?.34:.30,from.x,from.y,from.z,mat,12);const dir=target.subtract(from).normalize();const point=new B.PointLight('spell light',orb.position.clone(),scene);point.diffuse=B.Color3.FromHexString(c);point.intensity=hostile?.7:1.25;point.range=mobile?5:7;
+    const trail=newTrail(orb,c);projectiles.push({mesh:orb,light:point,trail,dir,hostile,speed:hostile?12:27,life:hostile?2.4:1.25,age:0});
+    particleBurst(from,c,hostile?18:36,hostile?1.3:2.0);if(!hostile){flash(c,.16);magicAudio('cast');}else audio(220,.14,'triangle',.032);
   }
   function cast(){if(!game.running||game.ended)return;const s=spells[game.spell];if(game.mana<s.cost){toast('Il potere magico si sta rigenerando');audio(115,.16);return;}
-    game.mana-=s.cost;game.pulse=.38;const eye=cam.position.clone(),forward=cam.getForwardRay(1).direction.normalize();const from=eye.add(forward.scale(1.2)).add(V(.1,-.09,0));
+    game.mana-=s.cost;game.pulse=.48;const eye=cam.position.clone(),forward=cam.getForwardRay(1).direction.normalize();const from=eye.add(forward.scale(1.2)).add(V(.1,-.09,0));
     if(game.spell===0){spawnBolt(from,from.add(forward.scale(40)),false);toast('Stupeficium',.8);}
-    else if(game.spell===1){let target=null,dMin=99;for(const p of props){const to=p.mesh.position.subtract(eye),d=to.length(),a=B.Vector3.Dot(to.normalize(),forward);if(d<19&&a>.62&&d<dMin){target=p;dMin=d;}}if(target){const dv=eye.subtract(target.mesh.position).normalize();target.vx+=dv.x*12;target.vy+=5.8;target.vz+=dv.z*12;burst(target.mesh.position,'#dec18a');toast('Accio · oggetto attirato');}else toast('Accio · punta verso un oggetto');audio(500,.28,'triangle');}
-    else if(game.spell===2){game.lumos=!game.lumos;wandLight.intensity=game.lumos?2.6:0;toast(game.lumos?'Lumos · la luce risponde':'Nox · oscurità');audio(740,.44);}
-    else if(game.spell===3){game.shield=2.4;game.shieldPulse=0;toast('Protego · barriera attiva');burst(eye,'#6ebae1',20,1.6);audio(510,.4,'sine');}
-    else if(game.spell===4){game.revealed=true;portalCore.setEnabled(true);game.sealRing.setEnabled(true);burst(V(0,5,-44.4),'#bdb4ed',28);toast('Revelio · un sigillo appare sul portale',3.3);audio(860,.5);}
+    else if(game.spell===1){let target=null,dMin=99;for(const p of props){const to=p.mesh.position.subtract(eye),d=to.length(),a=B.Vector3.Dot(to.normalize(),forward);if(d<19&&a>.62&&d<dMin){target=p;dMin=d;}}if(target){const dv=eye.subtract(target.mesh.position).normalize();target.vx+=dv.x*12;target.vy+=5.8;target.vz+=dv.z*12;magicWave(target.mesh.position,'#f1c98b',.75,3.2);magicAudio('accio');toast('Accio · oggetto attirato');}else toast('Accio · punta verso un oggetto');audio(500,.28,'triangle');}
+    else if(game.spell===2){game.lumos=!game.lumos;wandLight.intensity=game.lumos?2.6:0;magicImpact(from,game.lumos?'#ffd69a':'#6a7d94',.7);magicAudio('lumos');toast(game.lumos?'Lumos · la luce risponde':'Nox · oscurità');}
+    else if(game.spell===3){game.shield=2.8;game.shieldPulse=0;toast('Protego · barriera attiva');magicWave(eye.add(forward.scale(2)),'#71c6f5',.9,3.8);magicAudio('shield');}
+    else if(game.spell===4){game.revealed=true;portalCore.setEnabled(true);game.sealRing.setEnabled(true);magicWave(cam.position.clone().add(forward.scale(1.5)),'#c2b1fa',1.0,12);magicImpact(V(0,5,-44.4),'#bdb4ed',1.6);magicAudio('revelio');toast('Revelio · un sigillo appare sul portale',3.3);}
     updateHUD();
   }
   function updateHUD(){ $('hpNum').textContent=Math.round(game.hp);$('hpBar').style.width=game.hp+'%';$('manaBar').style.width=game.mana+'%';$('enemyBar').style.width=(Math.max(0,enemy.hp)/5*100)+'%';
@@ -216,7 +321,7 @@
   function win(){game.ended=true;game.running=false;$('hud').classList.add('hidden');$('finished').classList.remove('hidden');$('finishTag').textContent='CAPITOLO I · COMPLETATO';$('finishTitle').textContent='La porta si è aperta';$('finishText').textContent='Il Custode è stato sconfitto e il primo segreto di Hogwarts è nelle tue mani. Questo è solo l’inizio del nuovo Alohomora.';audio(780,.9);}
   function lose(){game.ended=true;game.running=false;$('hud').classList.add('hidden');$('finished').classList.remove('hidden');$('finishTag').textContent='IL CORTILE È CADUTO';$('finishTitle').textContent='La notte prevale';$('finishText').textContent='Il Custode ti ha sopraffatto. Torna nel cortile, cambia incantesimi e usa Protego per deviare i suoi attacchi.';}
   const inputs={keys:new Set(),axisX:0,axisY:0,joyId:null,lookId:null,px:0,py:0};
-  function reset(){game.hp=100;game.mana=100;game.shield=0;game.lumos=false;game.revealed=false;game.ended=false;game.vx=game.vz=game.vy=game.airborne=0;game.yaw=Math.PI;game.pitch=0;game.running=true;game.spell=0;game.pulse=0;game.bob=0;enemy.hp=5;enemy.alive=true;enemy.death=0;enemy.mode='idle';enemy.stun=0;enemy.windup=0;enemy.cool=3;enemy.x=6;enemy.z=-8;enemy.root.position.set(6,0,-8);enemy.root.rotation.set(0,0,0);enemy.root.setEnabled(true);if(enemy.modelReady)playEnemyAnim('Idle');for(const p of props){p.x=p.homeX;p.z=p.homeZ;p.y=.56;p.mesh.position.set(p.x,p.y,p.z);p.vx=p.vy=p.vz=0;}
+  function reset(){for(const p of projectiles)deleteProjectile(p);projectiles.length=0;game.hp=100;game.mana=100;game.shield=0;game.lumos=false;game.revealed=false;game.ended=false;game.vx=game.vz=game.vy=game.airborne=0;game.yaw=Math.PI;game.pitch=0;game.running=true;game.spell=0;game.pulse=0;game.bob=0;game.shake=0;cinematic.flash=0;enemy.hp=5;enemy.alive=true;enemy.death=0;enemy.mode='idle';enemy.stun=0;enemy.windup=0;enemy.cool=3;enemy.x=6;enemy.z=-8;enemy.root.position.set(6,0,-8);enemy.root.rotation.set(0,0,0);enemy.root.setEnabled(true);if(enemy.modelReady)playEnemyAnim('Idle');for(const p of props){p.x=p.homeX;p.z=p.homeZ;p.y=.56;p.mesh.position.set(p.x,p.y,p.z);p.vx=p.vy=p.vz=0;}
     cam.position.set(-1,1.72,27);cam.rotation.set(0,Math.PI,0);portalCore.setEnabled(false);game.sealRing.setEnabled(false);wandLight.intensity=0;
     $('intro').classList.add('hidden');$('finished').classList.add('hidden');$('hud').classList.remove('hidden');$('interact').classList.add('hidden');
     selectSpell(0);updateHUD();toast('Attraversa il cortile e preparati al duello',4);
@@ -249,13 +354,46 @@
     if(enemy.windup>0){enemy.windup-=dt;enemy.root.position.y+=Math.sin(phase*10)*.09;if(enemy.windup<=0&&enemy.alive){const src=V(enemy.x,2.5,enemy.z),dest=cam.position.clone().add(V(0,-.20,0));spawnBolt(src,dest,true);}}
   }
   function updateProps(dt){for(const p of props){p.vy-=19*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt;p.vx*=Math.max(0,1-dt*2.1);p.vz*=Math.max(0,1-dt*2.1);if(p.y<.56){p.y=.56;if(p.vy<-.4){p.vy=-p.vy*.28;audio(110,.07,'triangle',.012)}else p.vy=0;}p.mesh.position.set(p.x,p.y,p.z);p.mesh.rotation.y+=Math.hypot(p.vx,p.vz)*.008*dt;}}
-  function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){const p=projectiles[i];p.life-=dt;p.mesh.position.addInPlace(p.dir.scale(p.speed*dt));p.light.position.copyFrom(p.mesh.position);const pos=p.mesh.position;
-      if(p.hostile){const d=B.Vector3.Distance(pos,cam.position);if(d<1.2&&game.running){if(game.shield>0){burst(pos,'#78bedd',22,2.9);toast('Protego · incantesimo deviato');audio(730,.36,'triangle');}else{game.hp=Math.max(0,game.hp-19);$('hitFlash').style.opacity='.85';setTimeout(()=>$('hitFlash').style.opacity='0',170);audio(120,.24,'sawtooth',.06);if(game.hp<=0)lose();}p.life=0;updateHUD();}}
-      else if(enemy.alive&&B.Vector3.Distance(pos,V(enemy.x,2.05,enemy.z))<1.7){enemy.hp--;enemy.stun=.62;enemy.root.rotation.z=-.13;burst(pos,'#df7a6a',24,3.5);toast(enemy.hp>0?'Il Custode vacilla!':'Il Custode è sconfitto',2);p.life=0;audio(190,.38,'sawtooth',.05);if(enemy.hp<=0){enemy.alive=false;enemy.death=0;game.kills++;burst(V(enemy.x,2,enemy.z),'#e4c18a',60,3.8);updateHUD();toast('Il sigillo del portale si è indebolito. Usa Revelio.',4);}}
-      if(p.life<=0||Math.abs(pos.x)>110||Math.abs(pos.z)>110){p.mesh.dispose();p.light.dispose();projectiles.splice(i,1);}
+  function updateProjectiles(dt){for(let i=projectiles.length-1;i>=0;i--){
+      const p=projectiles[i];p.life-=dt;p.age+=dt;p.mesh.position.addInPlace(p.dir.scale(p.speed*dt));
+      p.light.position.copyFrom(p.mesh.position);p.light.intensity=(p.hostile?.65:1.05)+Math.sin(phase*34+p.age)*.16;
+      const pos=p.mesh.position;
+      if(p.hostile){
+        const d=B.Vector3.Distance(pos,cam.position);
+        if(d<1.25&&game.running){
+          if(game.shield>0){
+            magicImpact(pos,'#79d9ff',1.45);toast('Protego · incantesimo respinto');magicAudio('shield');
+            p.hostile=false;p.dir=V(enemy.x,2.05,enemy.z).subtract(pos).normalize();p.speed=25;p.life=1.3;
+            p.light.diffuse=B.Color3.FromHexString('#73d6ff');
+            p.mesh.material.emissiveColor=B.Color3.FromHexString('#73d6ff');
+            p.trail?.stop();p.trail?.dispose();p.trail=newTrail(p.mesh,'#73d6ff');
+          }else{
+            game.hp=Math.max(0,game.hp-19);$('hitFlash').style.opacity='.85';
+            setTimeout(()=>$('hitFlash').style.opacity='0',170);magicImpact(pos,'#d95165',1.0);
+            cinematic.shake=.11;audio(120,.24,'sawtooth',.06);if(game.hp<=0)lose();p.life=0;
+          }
+          updateHUD();
+        }
+      }else if(enemy.alive&&B.Vector3.Distance(pos,V(enemy.x,2.05,enemy.z))<1.7){
+        enemy.hp--;enemy.stun=.72;enemy.root.rotation.z=-.15;
+        magicImpact(pos,'#ff967a',1.45);cinematic.shake=.12;
+        toast(enemy.hp>0?'Il Custode vacilla!':'Il Custode è sconfitto',2);p.life=0;
+        if(enemy.hp<=0){enemy.alive=false;enemy.death=0;game.kills++;
+          magicImpact(V(enemy.x,2,enemy.z),'#f2ca8c',1.9);updateHUD();
+          toast('Il sigillo del portale si è indebolito. Usa Revelio.',4);}
+      }
+      if(pos.y<.20&&p.life>0){magicImpact(V(pos.x,.24,pos.z),p.hostile?'#ba4260':'#e88364',.68);p.life=0;}
+      if(p.life<=0||Math.abs(pos.x)>110||Math.abs(pos.z)>110){deleteProjectile(p);projectiles.splice(i,1);}
     }}
   function updateEffects(dt){for(let i=fx.length-1;i>=0;i--){const f=fx[i];if(f.kind==='mote'){const tt=phase+f.phase;f.mesh.position.set(f.origin.x+Math.sin(tt*.51)*.9,f.origin.y+Math.cos(tt*.7)*.28,f.origin.z+Math.cos(tt*.39)*1.2);continue;}
-      f.life-=dt;f.mesh.position.x+=f.vx*dt;f.mesh.position.y+=f.vy*dt;f.mesh.position.z+=f.vz*dt;f.vy-=4.8*dt;f.mesh.scaling.setAll(Math.max(.05,f.life*1.2));if(f.life<=0){f.mesh.dispose();fx.splice(i,1);}
+      f.life-=dt;
+      if(f.kind==='shock'||f.kind==='wave'){
+        const progress=1-f.life/f.total;const expand=f.kind==='shock'?(1+progress*9*f.scale):(1+progress*f.speed*2);
+        f.mesh.scaling.setAll(expand);f.mat.alpha=(f.kind==='shock'?.58:.45)*(1-progress)*(1-progress);
+        if(f.light)f.light.intensity=(mobile?.8:1.8)*(1-progress);
+        if(f.life<=0){f.light?.dispose();f.mesh.dispose();f.mat.dispose();fx.splice(i,1);}continue;
+      }
+      f.mesh.position.x+=f.vx*dt;f.mesh.position.y+=f.vy*dt;f.mesh.position.z+=f.vz*dt;f.vy-=4.8*dt;f.mesh.scaling.setAll(Math.max(.05,f.life*1.2));if(f.life<=0){f.mesh.dispose();fx.splice(i,1);}
     }}
   function updatePortal(dt){if(!portalCore)return;if(game.revealed){portalCore.rotation.z+=dt*.15;portalCore.scaling.x=1+Math.sin(phase*1.9)*.12;portalCore.scaling.y=1+Math.cos(phase*1.7)*.12;game.sealRing.rotation.y+=dt*.13;}
     const near=distance(cam.position.x,cam.position.z,0,-39.2)<7.0;
@@ -267,10 +405,10 @@
     burst(V(0,5.0,-44), '#e8cb90',75,5);win();}
   function tick(){const now=performance.now(),dt=clamp((now-last)/1000,.001,.042);last=now;phase+=dt;effectClock+=dt;
     sky.position.copyFrom(cam.position);
-    for(const torch of game.torches)torch.light.intensity=(mobile?.52:.72)+Math.sin(phase*10+torch.phase)*.065;
+    for(const torch of game.torches)torch.light.intensity=(mobile?.55:.78)+Math.sin(phase*10+torch.phase)*.10+Math.sin(phase*3.3+torch.phase)*.07;
     if(game.running){movePlayer(dt);updateEnemy(dt);updateProps(dt);updateProjectiles(dt);game.mana=Math.min(100,game.mana+dt*7.6);game.shield=Math.max(0,game.shield-dt);game.pulse=Math.max(0,game.pulse-dt);updatePortal(dt);if(game.toastTimeout>0){game.toastTimeout-=dt;if(game.toastTimeout<=0)$('toast').classList.remove('show');}}
     else{if(!game.ended){cam.rotation.y=Math.PI+Math.sin(phase*.20)*.045;cam.rotation.x=-.025;}updateEnemy(dt)}
-    updateEffects(dt);if(game.running&&effectClock>.1){updateHUD();effectClock=0;}
+    updateEffects(dt);updateCinematic(dt);if(game.running&&effectClock>.1){updateHUD();effectClock=0;}
     scene.render();}
   function jump(){if(!game.running)return;if(game.airborne<.02&&game.vy<=0){game.vy=6.5;audio(220,.1)}}
   function controls(){const joy=$('joy'),knob=$('knob');function handleJoy(e){let r=joy.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,radius=34,mag=Math.max(1,Math.hypot(dx,dy)),k=Math.min(1,mag/radius),a=Math.atan2(dy,dx);inputs.axisX=Math.cos(a)*k;inputs.axisY=-Math.sin(a)*k;knob.style.transform=`translate(${Math.cos(a)*radius*k}px,${Math.sin(a)*radius*k}px)`;}
