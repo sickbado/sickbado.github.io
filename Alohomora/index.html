@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#141029"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>ALOHOMORA · Duelli Oscuri · v0.5</title>
+<title>ALOHOMORA · Duelli Oscuri · v0.5.1</title>
 <style>
 :root{--gold:#d8c39c;--orange:#c6a172;--ink:#070d12;--glass:rgba(5,12,18,.82)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;margin:0;overflow:hidden;background:#111125;color:#fff3df;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none}button{font:inherit;cursor:pointer}
@@ -256,28 +256,28 @@ const shades=[];
 function prismBand(dst,y0,y1,r0,r1,sides,col,tw=0){for(let i=0;i<sides;i++){const a=tw+i*2*Math.PI/sides,b=tw+(i+1)*2*Math.PI/sides;const A=[Math.cos(a)*r0,y0,Math.sin(a)*r0],B=[Math.cos(b)*r0,y0,Math.sin(b)*r0],C=[Math.cos(a)*r1,y1,Math.sin(a)*r1],D=[Math.cos(b)*r1,y1,Math.sin(b)*r1];triTo(dst,A,B,C,col);triTo(dst,B,D,C,col.map(v=>v*0.98));}}
 function capCone(dst,tipY,baseY,baseR,sides,col,tw=0){for(let i=0;i<sides;i++){const a=tw+i*2*Math.PI/sides,b=tw+(i+1)*2*Math.PI/sides;triTo(dst,[0,tipY,0],[Math.cos(a)*baseR,baseY,Math.sin(a)*baseR],[Math.cos(b)*baseR,baseY,Math.sin(b)*baseR],col)}}
 function limb(dst,x0,y0,z0,x1,y1,z1,w,col){const dx=x1-x0,dz=z1-z0,ang=Math.atan2(dz,dx),len=Math.hypot(dx,dz);const ux=Math.sin(ang)*w,uz=-Math.cos(ang)*w;const p1=[x0-ux,y0,z0-uz],p2=[x0+ux,y0,z0+uz],p3=[x1+ux,y1,z1+uz],p4=[x1-ux,y1,z1-uz];triTo(dst,p1,p2,p3,col);triTo(dst,p1,p3,p4,col.map(v=>v*0.95));}
-function makeWizardMesh(friend=false){let a=[];const robe=friend?[.12,.22,.38]:[.15,.09,.20],trim=friend?[.33,.46,.67]:[.39,.12,.18],skin=friend?[.80,.66,.51]:[.63,.55,.61],metal=friend?[.61,.66,.72]:[.49,.46,.52];
+function makeWizardMesh(friend=false){let a=[];const savedVerts=verts;verts=a;const robe=friend?[.12,.22,.38]:[.15,.09,.20],trim=friend?[.33,.46,.67]:[.39,.12,.18],skin=friend?[.80,.66,.51]:[.63,.55,.61],metal=friend?[.61,.66,.72]:[.49,.46,.52];
  prismBand(a,-1.22,.45,.28,.55,7,robe); prismBand(a,.45,1.40,.55,.42,7,trim,Math.PI/7); capCone(a,2.36,1.26,.64,7,robe);
  cube(0,1.54,0,.34,.38,.31,skin); cube(-.18,1.66,.16,.09,.08,.05,[.05,.05,.06]); cube(.18,1.66,.16,.09,.08,.05,[.05,.05,.06]); cube(0,1.46,.18,.15,.05,.03,[.36,.22,.20]);
  limb(a,-.46,1.18,0,-.78,.18,.05,.08,trim); limb(a,.46,1.18,0,.74,.14,.00,.08,trim); limb(a,-.18,-.76,0,-.18,-1.50,.02,.07,robe); limb(a,.18,-.76,0,.18,-1.50,.02,.07,robe);
  cube(.93,.20,.05,.06,1.18,.06,[.38,.23,.08]); cube(.93,.73,.05,.18,.12,.18,metal); cube(.0,1.08,-.30,.44,.18,.30,trim.map(v=>v*0.95));
  for(let i=0;i<7;i++){const ang=i*2*Math.PI/7;triTo(a,[0,-1.27,0],[Math.cos(ang)*.54,-.98,Math.sin(ang)*.54],[Math.cos(ang+.48)*.54,-.98,Math.sin(ang+.48)*.54],robe.map(v=>v*0.9));}
- return a; }
-function makeDementorMesh(){let a=[];const c=[.17,.18,.24],c2=[.08,.08,.11],mist=[.32,.36,.42]; prismBand(a,-1.55,1.02,.25,.76,9,c2,Math.PI/9); capCone(a,2.24,1.00,.82,9,c); cube(0,1.28,0,.26,.32,.22,[.48,.46,.44]);
+ verts=savedVerts;return a; }
+function makeDementorMesh(){let a=[];const savedVerts=verts;verts=a;const c=[.17,.18,.24],c2=[.08,.08,.11],mist=[.32,.36,.42]; prismBand(a,-1.55,1.02,.25,.76,9,c2,Math.PI/9); capCone(a,2.24,1.00,.82,9,c); cube(0,1.28,0,.26,.32,.22,[.48,.46,.44]);
  for(const side of [-1,1]){limb(a,side*.55,1.02,0,side*1.18,.14,.18,.10,c); limb(a,side*.30,-.10,0,side*.95,-1.20,.12,.07,c2)}
  for(let i=0;i<8;i++){const ang=i*2*Math.PI/8;triTo(a,[0,-1.62,0],[Math.cos(ang)*.18,-.55,Math.sin(ang)*.18],[Math.cos(ang+.45)*.88,-2.30,Math.sin(ang+.45)*.88],mist.map(v=>v*range(.82,1.10)));}
- cube(0,1.64,.12,.16,.06,.03,[.74,.74,.78]); cube(0,1.50,.18,.12,.03,.02,[.14,.07,.07]); return a; }
-function makeKnightMesh(){let a=[];const steel=[.48,.50,.55],steel2=[.25,.26,.30],cloth=[.24,.10,.12],gold=[.74,.62,.34]; prismBand(a,-1.05,.20,.38,.46,6,steel2); prismBand(a,.20,1.48,.50,.46,6,steel,Math.PI/6); cube(0,1.68,0,.48,.44,.40,steel); capCone(a,2.26,1.86,.44,6,steel2);
+ cube(0,1.64,.12,.16,.06,.03,[.74,.74,.78]); cube(0,1.50,.18,.12,.03,.02,[.14,.07,.07]); verts=savedVerts;return a; }
+function makeKnightMesh(){let a=[];const savedVerts=verts;verts=a;const steel=[.48,.50,.55],steel2=[.25,.26,.30],cloth=[.24,.10,.12],gold=[.74,.62,.34]; prismBand(a,-1.05,.20,.38,.46,6,steel2); prismBand(a,.20,1.48,.50,.46,6,steel,Math.PI/6); cube(0,1.68,0,.48,.44,.40,steel); capCone(a,2.26,1.86,.44,6,steel2);
  cube(0,1.48,.22,.22,.12,.05,[.06,.06,.06]); cube(0,1.30,.22,.12,.04,.03,[.30,.06,.06]); cube(-.62,1.02,0,.26,.28,.26,steel); cube(.62,1.02,0,.26,.28,.26,steel);
  limb(a,-.54,1.00,0,-.85,.10,.00,.09,steel2); limb(a,.54,1.00,0,.86,.16,.00,.09,steel2); limb(a,-.20,-.42,0,-.24,-1.55,.03,.08,steel2); limb(a,.20,-.42,0,.24,-1.55,.03,.08,steel2);
  cube(-1.05,.32,0,.12,1.15,.12,steel2); cube(-1.05,.92,0,.82,.76,.12,steel); cube(-1.05,.92,.09,.46,.42,.04,[.30,.16,.08]);
- cube(.98,.20,0,.08,1.45,.08,steel2); cube(.98,1.02,0,.28,.30,.28,gold); return a; }
-function makeStalkerMesh(){let a=[];const flesh=[.30,.25,.22],fur=[.10,.09,.10],eye=[.78,.16,.11]; cube(0,.22,0,.86,.36,1.00,fur); cube(0,.44,.34,.42,.22,.42,flesh); cube(-.14,.48,.54,.09,.06,.04,eye); cube(.14,.48,.54,.09,.06,.04,eye);
+ cube(.98,.20,0,.08,1.45,.08,steel2); cube(.98,1.02,0,.28,.30,.28,gold); verts=savedVerts;return a; }
+function makeStalkerMesh(){let a=[];const savedVerts=verts;verts=a;const flesh=[.30,.25,.22],fur=[.10,.09,.10],eye=[.78,.16,.11]; cube(0,.22,0,.86,.36,1.00,fur); cube(0,.44,.34,.42,.22,.42,flesh); cube(-.14,.48,.54,.09,.06,.04,eye); cube(.14,.48,.54,.09,.06,.04,eye);
  for(const side of [-1,1]){limb(a,side*.36,.12,.24,side*1.05,-.28,.68,.05,fur); limb(a,side*.36,.10,-.08,side*1.10,-.34,-.62,.05,fur); limb(a,side*.12,.08,.44,side*.42,-.70,1.04,.05,fur); limb(a,side*.12,.06,-.30,side*.44,-.68,-1.02,.05,fur);} 
  triTo(a,[0,.34,.78],[-.10,.26,1.06],[-.02,.16,1.00],[.92,.92,.92]); triTo(a,[0,.34,.78],[.10,.26,1.06],[.02,.16,1.00],[.92,.92,.92]);
- return a; }
-function makeSpecterMesh(){let a=[];const c=[.22,.28,.39],glow=[.44,.62,.86],dark=[.08,.10,.13]; prismBand(a,-1.05,.65,.20,.46,7,c,Math.PI/8); capCone(a,1.95,.45,.52,7,glow); for(let i=0;i<6;i++){const ang=i*2*Math.PI/6;triTo(a,[0,-1.30,0],[Math.cos(ang)*.15,-.25,Math.sin(ang)*.15],[Math.cos(ang+.55)*.52,-2.05,Math.sin(ang+.55)*.52],c.map(v=>v*range(.88,1.08)))}
- cube(0,1.02,.10,.10,.10,.03,[.90,.95,1]); cube(-.14,1.00,.09,.06,.06,.03,dark); cube(.14,1.00,.09,.06,.06,.03,dark); limb(a,-.36,.72,0,-.86,.10,.18,.06,glow); limb(a,.36,.72,0,.86,.10,.18,.06,glow); return a; }
+ verts=savedVerts;return a; }
+function makeSpecterMesh(){let a=[];const savedVerts=verts;verts=a;const c=[.22,.28,.39],glow=[.44,.62,.86],dark=[.08,.10,.13]; prismBand(a,-1.05,.65,.20,.46,7,c,Math.PI/8); capCone(a,1.95,.45,.52,7,glow); for(let i=0;i<6;i++){const ang=i*2*Math.PI/6;triTo(a,[0,-1.30,0],[Math.cos(ang)*.15,-.25,Math.sin(ang)*.15],[Math.cos(ang+.55)*.52,-2.05,Math.sin(ang+.55)*.52],c.map(v=>v*range(.88,1.08)))}
+ cube(0,1.02,.10,.10,.10,.03,[.90,.95,1]); cube(-.14,1.00,.09,.06,.06,.03,dark); cube(.14,1.00,.09,.06,.06,.03,dark); limb(a,-.36,.72,0,-.86,.10,.18,.06,glow); limb(a,.36,.72,0,.86,.10,.18,.06,glow); verts=savedVerts;return a; }
 const npcFriendV=makeWizardMesh(true),npcEnemyV=makeWizardMesh(false),dementorV=makeDementorMesh(),knightV=makeKnightMesh(),stalkerV=makeStalkerMesh(),specterV=makeSpecterMesh();
 function meshBuffer(a){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);return b}
 const friendB=meshBuffer(npcFriendV),foeB=meshBuffer(npcEnemyV),dementorB=meshBuffer(dementorV),knightB=meshBuffer(knightV),stalkerB=meshBuffer(stalkerV),specterB=meshBuffer(specterV);
