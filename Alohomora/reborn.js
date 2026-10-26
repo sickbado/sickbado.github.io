@@ -136,7 +136,7 @@
   function glints(){const mat=material('luminescent insects','#96ba9b',{emissive:'#b9bf83'});for(let i=0;i<45;i++){let x=(rand(i,12)-.5)*67,z=(rand(i,32)-.5)*70;const p=sphere('floating motes',.06+rand(i,2)*.07,x,1.5+rand(i,77)*5,z,mat,4);fx.push({mesh:p,origin:p.position.clone(),phase:i*1.75,kind:'mote'});}}
   function sceneSetup(){
     engine=new B.Engine(canvas,true,{preserveDrawingBuffer:false,stencil:true,antialias:false},false);
-    engine.setHardwareScalingLevel(mobile?Math.max(1.25,window.devicePixelRatio/1.5):1);
+    engine.setHardwareScalingLevel(mobile?1.12:1);
     scene=new B.Scene(engine);scene.clearColor=new B.Color4(.07,.09,.13,1);scene.fogMode=B.Scene.FOGMODE_EXP2;scene.fogDensity=.0057;scene.fogColor=B.Color3.FromHexString('#5f6871');
     scene.imageProcessingConfiguration.toneMappingEnabled=true;
     scene.imageProcessingConfiguration.toneMappingType=B.ImageProcessingConfiguration.TONEMAPPING_ACES;
