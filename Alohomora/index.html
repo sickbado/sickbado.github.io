@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#141029"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>ALOHOMORA · Il risveglio · v0.3</title>
+<title>ALOHOMORA · Duelli Oscuri · v0.5</title>
 <style>
 :root{--gold:#d8c39c;--orange:#c6a172;--ink:#070d12;--glass:rgba(5,12,18,.82)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{height:100%;width:100%;margin:0;overflow:hidden;background:#111125;color:#fff3df;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none}button{font:inherit;cursor:pointer}
@@ -98,6 +98,7 @@
 .action.main{border-color:#b8cdb6;background:radial-gradient(circle,#304d4e,#071720)}
 #hint{opacity:.38}
 @media(max-height:480px){#weapon{width:min(14vw,160px);right:5%;bottom:-37%}#worldTicker{top:51px;left:max(8px,env(safe-area-inset-left));font-size:9px}#worldMap{top:63px;width:62px;height:62px}#magicHud{bottom:0}#spells{gap:2px}.spell{min-width:30px;height:30px;font-size:16px}.brand strong{font-size:16px}.questBox{max-width:200px;padding:5px 8px}}
+#duelTarget{position:absolute;z-index:18;left:50%;top:max(50px,env(safe-area-inset-top));transform:translateX(-50%);min-width:172px;max-width:48vw;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;background:#071018b3;padding:8px 16px;border:1px solid #9f667575;border-radius:4px;box-shadow:0 4px 18px #000a}#duelTarget.visible{opacity:1}#duelName{font:600 10px Georgia,serif;letter-spacing:2px;color:#e6c6bd}#duelTrack{margin-top:6px;height:4px;background:#59373d;border-radius:4px;overflow:hidden}#duelLife{height:100%;background:linear-gradient(90deg,#853c49,#d77d72);width:100%;transition:width .15s}@media(max-height:480px){#duelTarget{top:6px;left:52%;padding:4px 10px;min-width:130px}#duelName{font-size:8px}}
 </style></head>
 <body>
 <div id="stage"><div id="daylight"></div><div id="sunDisk"></div><div id="stars"></div><canvas id="gl" aria-label="Ambiente tridimensionale esplorabile"></canvas><div id="vignette"></div><div id="redflash"></div></div>
@@ -108,9 +109,10 @@
 <div id="magicHud"><div id="spellName">Lumos</div><div id="spells" role="group" aria-label="Seleziona un incantesimo"></div></div>
 <button id="actionInteract" aria-label="Interagisci">✋</button><button id="broomButton" aria-label="Sali o scendi dalla scopa">🧹</button>
 <button id="helpBtn" aria-label="Come si gioca">?</button>
-<div id="helpOverlay"><div id="helpCard"><h2>Benvenuto ad Alohomora</h2><p>Un’avventura gotica non ufficiale ispirata al mondo magico di Harry Potter. Cammina nella foresta, scopri il castello di Hogwarts, raggiungi Hogsmeade, prendi l'Hogwarts Express e scopri i passaggi nascosti.</p><p>🕹️ <b>iPhone:</b> joystick sinistro per muoverti, trascina sul mondo per guardare, scegli un incantesimo sulla barra, ✦ per lanciarlo, 🧹 per volare, ✋ per parlare o aprire passaggi. Usa il pulsante ↑ per saltare o salire con la scopa.</p><p>⌨️ <b>PC:</b> WASD per muoverti, mouse per guardare, clic per lanciare, tasti 1–9 per scegliere incantesimi, F per interagire, B per la scopa, spazio per saltare/salire, C per scendere.</p><p><b>Magie reattive:</b> Accio sposta gli oggetti, Wingardium Leviosa li solleva, Incendio accende i falò, Aguamenti spegne il fuoco, Reparo ripara gli oggetti, Revelio svela passaggi, Alohomora apre serrature, Stupeficium ed Expelliarmus reagiscono ai nemici, Protego protegge e Lumos illumina.</p><button id="helpClose">TORNA AL GIOCO</button></div></div>
+<div id="helpOverlay"><div id="helpCard"><h2>Benvenuto ad Alohomora</h2><p>Un’avventura gotica non ufficiale ispirata al mondo magico di Harry Potter, con nemici differenziati, movimenti animati, incantesimi a distanza e duelli più dinamici. Cammina nella foresta, scopri il castello di Hogwarts, raggiungi Hogsmeade, prendi l'Hogwarts Express e scopri i passaggi nascosti.</p><p>🕹️ <b>iPhone:</b> joystick sinistro per muoverti, trascina sul mondo per guardare, scegli un incantesimo sulla barra, ✦ per lanciarlo, 🧹 per volare, ✋ per parlare o aprire passaggi. Usa il pulsante ↑ per saltare o salire con la scopa.</p><p>⌨️ <b>PC:</b> WASD per muoverti, mouse per guardare, clic per lanciare, tasti 1–9 per scegliere incantesimi, F per interagire, B per la scopa, spazio per saltare/salire, C per scendere.</p><p><b>Magie reattive:</b> Accio sposta gli oggetti, Wingardium Leviosa li solleva, Incendio accende i falò, Aguamenti spegne il fuoco, Reparo ripara gli oggetti, Revelio svela passaggi, Alohomora apre serrature, Stupeficium ed Expelliarmus reagiscono ai nemici, Protego protegge e Lumos illumina.</p><button id="helpClose">TORNA AL GIOCO</button></div></div>
+<div id="duelTarget"><div id="duelName"></div><div id="duelTrack"><div id="duelLife"></div></div></div>
 <div id="hud">
-<div class="top"><div class="brand">UN MONDO SENZA TEMPO<strong>Alohomora <sup style="font-size:10px;opacity:.65">0.3</sup></strong></div><div class="questBox"><small>✦ LA MISSIONE</small><div id="missionText">Esplora Hogwarts e impara gli incantesimi</div><div class="sigils" id="sigilBars"><b></b><b></b><b></b></div></div></div>
+<div class="top"><div class="brand">UN MONDO SENZA TEMPO<strong>Alohomora <sup style="font-size:10px;opacity:.65">0.5</sup></strong></div><div class="questBox"><small>✦ LA MISSIONE</small><div id="missionText">Esplora Hogwarts e impara gli incantesimi</div><div class="sigils" id="sigilBars"><b></b><b></b><b></b></div></div></div>
 <div id="compass"><span id="compassText">✧ N ✧</span><div class="compassLine"></div></div>
 <div id="crosshair"></div><div id="toast"></div>
 <div id="weapon"><svg width="100%" height="100%" viewBox="0 0 320 500" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="wandWood" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#100d19"/><stop offset=".32" stop-color="#a76d44"/><stop offset=".68" stop-color="#271a2c"/><stop offset="1" stop-color="#c7a06f"/></linearGradient><linearGradient id="wandGlow"><stop stop-color="#fff8d5"/><stop offset="1" stop-color="#d1a45e"/></linearGradient></defs><path d="M88 29 Q92 40 103 63 L216 364 200 378 86 56 Q81 39 88 29Z" fill="url(#wandWood)" stroke="#1a1320" stroke-width="5"/><path d="M99 84 L207 363" stroke="#dbad74" stroke-width="2" opacity=".7"/><path d="M202 358 L224 409 249 446" stroke="#3a242c" stroke-width="21" stroke-linecap="round"/><g stroke="#e4b276" stroke-width="4" opacity=".7"><path d="M204 365L219 355"/><path d="M213 382L229 375"/><path d="M217 401L239 390"/></g><path d="M190 384 Q205 375 217 388 Q235 380 244 399 L277 447 305 498 215 499 199 456 176 417 Q169 395 190 384Z" fill="#754d3c" stroke="#382632" stroke-width="6"/><path d="M193 397 Q206 384 220 401 L245 429" stroke="#be8960" stroke-width="7"/><circle cx="89" cy="34" r="7" fill="url(#wandGlow)"/><circle cx="89" cy="34" r="17" fill="#fff2bb" opacity=".2"/></svg></div><div id="hand"><svg width="100%" height="100%" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="lh" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#c08054"/><stop offset=".6" stop-color="#90563d"/><stop offset="1" stop-color="#3d2930"/></linearGradient></defs><path d="M45 219 L28 167 Q22 148 15 123 Q10 106 21 103 31 103 35 118 L45 134 31 67 Q27 48 38 44 47 43 51 58 L67 111 57 31 Q53 11 66 8 78 8 80 29 L94 103 96 26 Q97 10 110 11 121 14 119 29 L116 106 136 58 Q143 43 155 48 166 56 158 70 L135 127 Q158 107 169 116 182 128 165 143 L136 179 131 220Z" fill="url(#lh)" stroke="#38252b" stroke-width="5" stroke-linejoin="round"/><path d="M44 171 Q90 146 137 176 L148 215 38 220Z" fill="#412c31" stroke="#b18059" stroke-width="5"/><path d="M53 185 L135 179 M50 199 L140 193" stroke="#d19b6c" stroke-width="4" opacity=".55"/></svg></div>
@@ -123,14 +125,28 @@
 (function(){'use strict';
 const $=id=>document.getElementById(id);const canvas=$('gl');let gl=canvas.getContext('webgl',{alpha:true,antialias:false,depth:true,premultipliedAlpha:false,powerPreference:'high-performance'});
 if(!gl){$('startScreen').querySelector('.panel').innerHTML='<h1>WebGL non disponibile</h1><p>Apri questo gioco con Safari aggiornato su iPhone, oppure Chrome su computer.</p>';return;}
-const VSH=`attribute vec3 aP;attribute vec3 aC;attribute float aB;uniform mat4 uVP;uniform vec3 uOffset;uniform float uTime;uniform vec3 uEye;varying vec3 vC;varying float vF;varying vec3 vW;void main(){vec3 p=aP+uOffset;p.x+=aB*.16*sin(uTime*1.45+aP.x*.41+aP.z*.24);p.z+=aB*.09*cos(uTime*1.6+aP.z*.32);gl_Position=uVP*vec4(p,1.);vC=aC;vW=p;vF=clamp((distance(p.xz,uEye.xz)-26.)/128.,0.,.94);}`;
+const VSH=`attribute vec3 aP;attribute vec3 aC;attribute float aB;uniform mat4 uVP;uniform vec3 uOffset;uniform float uTime;uniform vec3 uEye;uniform mat4 uModel;uniform vec4 uRig;uniform vec4 uDamage;varying vec3 vC;varying float vF;varying vec3 vW;void main(){vec3 p=aP;
+float leg=(1.-smoothstep(-.95,-.22,p.y))*uRig.w;
+float arm=step(.32,abs(p.x))*smoothstep(.02,.70,p.y)*(1.-smoothstep(1.40,2.12,p.y));
+float phase=p.x>0.0?0.0:3.14159;
+p.z+=leg*sin(uRig.x+phase)*.32*uRig.y;
+p.z+=arm*(sin(uRig.x+phase)*.16*uRig.y-(p.x>0.0?uRig.z*.55:0.));
+p.y+=arm*(p.x>0.0?uRig.z*.22:0.);
+p.x+=arm*(p.x>0.0?uRig.z*.15:0.);
+float hit=uDamage.x,death=uDamage.y;
+p.x+=sin(p.y*3.8+phase)*hit*.14;
+p.y-=death*(1.-smoothstep(-1.4,.8,p.y))*.12;
+vec3 q=(uModel*vec4(p,1.)).xyz+uOffset;
+q.x+=aB*.16*sin(uTime*1.45+aP.x*.41+aP.z*.24);
+q.z+=aB*.09*cos(uTime*1.6+aP.z*.32);
+gl_Position=uVP*vec4(q,1.);p=q;vC=aC;vW=p;vF=clamp((distance(p.xz,uEye.xz)-26.)/128.,0.,.94);}`;
 const FSH=`precision mediump float;uniform float uDay;varying vec3 vC;varying float vF;varying vec3 vW;void main(){float grain=fract(sin(dot(floor(vW*vec3(4.,3.,4.)),vec3(12.9898,78.233,38.327)))*43758.5453);float rough=.90+.17*grain;float ember=clamp((vC.r-vC.b)*1.75,0.,1.);vec3 daylight=vec3(.74,.84,.93);vec3 c=vC*daylight*(.40+.57*uDay)*rough;vec3 lumin=vC*vec3(1.00,.88,.66)*(.62+.65*uDay);c=mix(c,lumin,ember*.66);float contrast=clamp((dot(c,vec3(.299,.587,.114))-.18)*1.12+.18,0.,1.);c=mix(c,c*vec3(.87,.94,1.08),.28);vec3 fog=mix(vec3(.035,.060,.086),vec3(.27,.37,.39),uDay);float ff=vF*vF*(3.-2.*vF);c=mix(c,fog,ff*.88);gl_FragColor=vec4(clamp(c,0.,1.),1.);}`;
 const PVSH=`attribute vec3 aP;attribute vec3 aC;attribute float aS;uniform mat4 uVP;uniform vec3 uEye;varying vec3 vC;void main(){gl_Position=uVP*vec4(aP,1.);float d=distance(aP,uEye);gl_PointSize=clamp(aS*58./max(d,3.),2.,34.);vC=aC;}`;
 const PFSH=`precision mediump float;varying vec3 vC;void main(){float d=length(gl_PointCoord-vec2(.5))*2.;float a=pow(max(0.,1.-d),2.);gl_FragColor=vec4(vC,a*.75);}`;
 function shader(t,s){const h=gl.createShader(t);gl.shaderSource(h,s);gl.compileShader(h);if(!gl.getShaderParameter(h,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(h));return h;}
 function program(v,f){const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,v));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p;}
 const worldP=program(VSH,FSH),particleP=program(PVSH,PFSH);
-function locs(p){return{p,aP:gl.getAttribLocation(p,'aP'),aC:gl.getAttribLocation(p,'aC'),aB:gl.getAttribLocation(p,'aB'),aS:gl.getAttribLocation(p,'aS'),vp:gl.getUniformLocation(p,'uVP'),eye:gl.getUniformLocation(p,'uEye'),time:gl.getUniformLocation(p,'uTime'),offset:gl.getUniformLocation(p,'uOffset'),day:gl.getUniformLocation(p,'uDay')}}const L=locs(worldP),P=locs(particleP);
+function locs(p){return{p,aP:gl.getAttribLocation(p,'aP'),aC:gl.getAttribLocation(p,'aC'),aB:gl.getAttribLocation(p,'aB'),aS:gl.getAttribLocation(p,'aS'),vp:gl.getUniformLocation(p,'uVP'),eye:gl.getUniformLocation(p,'uEye'),time:gl.getUniformLocation(p,'uTime'),offset:gl.getUniformLocation(p,'uOffset'),model:gl.getUniformLocation(p,'uModel'),rig:gl.getUniformLocation(p,'uRig'),damage:gl.getUniformLocation(p,'uDamage'),day:gl.getUniformLocation(p,'uDay')}}const L=locs(worldP),P=locs(particleP);
 let seed=7011;function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}function range(a,b){return a+(b-a)*rnd()}const clamp=(a,l,h)=>Math.max(l,Math.min(h,a));function dist(x,z,X,Z){return Math.hypot(x-X,z-Z)}
 function terrain(x,z){let y=.36*Math.sin(x*.095)*Math.cos(z*.082)+.4*Math.sin(x*.039+z*.065)+.15*Math.sin(x*.35+z*.19);const ridge=Math.max(0,(Math.abs(x)-38)/70);y+=ridge*ridge*11;const back=Math.max(0,(-z-66)/50);y+=back*back*8;return y}
 let verts=[];function triTo(dst,a,b,c,col,bend=[0,0,0]){const e1=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],e2=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];let nx=e1[1]*e2[2]-e1[2]*e2[1],ny=e1[2]*e2[0]-e1[0]*e2[2],nz=e1[0]*e2[1]-e1[1]*e2[0],norm=Math.max(1e-6,Math.hypot(nx,ny,nz));ny/=norm;nx/=norm;nz/=norm;let light=clamp(.70+Math.max(0,ny)*.24+nx*.10+nz*.08,.43,1.12);const points=[a,b,c];for(let i=0;i<3;i++){dst.push(...points[i],Math.min(1,col[0]*light),Math.min(1,col[1]*light),Math.min(1,col[2]*light),bend[i]||0)}}
@@ -218,27 +234,54 @@ for(let i=0;i<10;i++){const side=i%2?1:-1,idx=Math.floor(i/2),x=43+side*(9+idx%2
 
 const staticB=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,staticB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(verts),gl.STATIC_DRAW);const staticN=verts.length/7;verts=null;
 const runev=[];crystal(runev,.72,1.25,[1,.66,.23]);const runeB=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,runeB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(runev),gl.STATIC_DRAW);
+
 const enemyV=[];crystal(enemyV,.85,1.25,[.69,.25,.51]);for(let k=0;k<5;k++){const a=k*2*Math.PI/5;triTo(enemyV,[Math.cos(a)*.35,.3,Math.sin(a)*.35],[Math.cos(a)*1.35,1.2,Math.sin(a)*1.35],[Math.cos(a+.6)*.45,-.1,Math.sin(a+.6)*.45],[.29,.28,.42])}const enemyB=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,enemyB);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(enemyV),gl.STATIC_DRAW);
 
 const enemies=[
- {name:'Ombra del Bosco',x:12,z:-18,hp:3,alive:true,phase:0,role:'enemy'},
- {name:'Dissennatore',x:-17,z:-32,hp:4,alive:true,phase:1.4,role:'enemy'},
- {name:'Mago oscuro',x:3,z:-63,hp:4,alive:true,phase:2.8,role:'enemy'},
- {name:'Spettro di Hogwarts',x:-12,z:-58,hp:3,alive:true,phase:4.2,role:'enemy'},
+ {name:'Ombra del Bosco',x:12,z:-18,hp:4,alive:true,phase:0,role:'enemy',etype:'stalker'},
+ {name:'Dissennatore',x:-17,z:-32,hp:5,alive:true,phase:1.4,role:'enemy',etype:'dementor'},
+ {name:'Mago oscuro',x:3,z:-63,hp:5,alive:true,phase:2.8,role:'enemy',etype:'wizard'},
+ {name:'Spettro di Hogwarts',x:-12,z:-58,hp:4,alive:true,phase:4.2,role:'enemy',etype:'specter'},
  {name:'Luna',x:-3,z:12,hp:5,alive:true,phase:0.8,role:'friend',line:'La biblioteca custodisce più di quanto immagini. Prova Revelio.'},
  {name:'Hagrid',x:-14,z:-15,hp:9,alive:true,phase:3.9,role:'friend',line:'Il castello ha un passaggio segreto. Solo Alohomora può aprirlo.'},
  {name:'Prefetto',x:-31,z:-36,hp:5,alive:true,phase:1.8,role:'friend',line:'Benvenuto a Hogwarts! Usa Lumos quando arriva la notte.'},
  {name:'Capotreno',x:60,z:-52,hp:7,alive:true,phase:2.4,role:'friend',line:'L’Hogwarts Express arriva a ogni giro. Fai attenzione ai binari!'},
  {name:'Mercante',x:44,z:22,hp:5,alive:true,phase:2.9,role:'friend',line:'Ad Hogsmeade ogni vecchio baule nasconde qualcosa!'},
  {name:'Allievo Corvonero',x:35,z:-6,hp:4,alive:true,phase:1.2,role:'friend',line:'Wingardium Leviosa solleva i libri. Prova!'},
- {name:'Duellante oscuro',x:18,z:-37,hp:5,alive:true,phase:5.5,role:'enemy'},
+ {name:'Guardiano Corazzato',x:18,z:-37,hp:7,alive:true,phase:5.5,role:'enemy',etype:'knight'},
  {name:'Gufo messaggero',x:4,z:5,hp:3,alive:true,phase:6.2,role:'owl',line:'Uh-uh! Il treno porta a Hogwarts.'}
 ];
-for(const n of enemies){n.baseX=n.x;n.baseZ=n.z;n.vx=0;n.vz=0;n.vy=0;n.knock=0;n.rag=0;n.stun=0;n.talked=false;n.ang=n.phase;n.attack=0;n.healthMax=n.hp;}
-const shades=[];function makeWizardMesh(friend=false){let a=[];const dark=friend?[.14,.26,.41]:[.19,.12,.27],cloth=friend?[.29,.43,.60]:[.35,.20,.37];let save=verts;verts=a;cube(0,-.1,0,.67,1.1,.45,dark);cube(0,.93,0,.63,.65,.48,cloth);cube(0,1.63,0,.45,.49,.45,friend?[.81,.65,.49]:[.49,.39,.53]);cube(-.58,.9,0,.32,.75,.33,cloth);cube(.58,.9,0,.32,.75,.33,cloth);cube(-.22,-.75,0,.23,.65,.26,dark);cube(.22,-.75,0,.23,.65,.26,dark);for(let i=0;i<5;i++){const a1=i*2*Math.PI/5,a2=(i+1)*2*Math.PI/5;add([0,2.45,0],[Math.cos(a1)*.86,1.92,Math.sin(a1)*.86],[Math.cos(a2)*.86,1.92,Math.sin(a2)*.86],dark)}verts=save;return a}
-const npcFriendV=makeWizardMesh(true),npcEnemyV=makeWizardMesh(false);
+for(const n of enemies){n.baseX=n.x;n.baseZ=n.z;n.vx=0;n.vz=0;n.vy=0;n.knock=0;n.rag=0;n.stun=0;n.talked=false;n.ang=n.phase;n.attack=0;n.healthMax=n.hp;n.facing=Math.PI/2-n.ang;n.casting=0;n.windup=0;n.hitFlash=0;}
+const shades=[];
+function prismBand(dst,y0,y1,r0,r1,sides,col,tw=0){for(let i=0;i<sides;i++){const a=tw+i*2*Math.PI/sides,b=tw+(i+1)*2*Math.PI/sides;const A=[Math.cos(a)*r0,y0,Math.sin(a)*r0],B=[Math.cos(b)*r0,y0,Math.sin(b)*r0],C=[Math.cos(a)*r1,y1,Math.sin(a)*r1],D=[Math.cos(b)*r1,y1,Math.sin(b)*r1];triTo(dst,A,B,C,col);triTo(dst,B,D,C,col.map(v=>v*0.98));}}
+function capCone(dst,tipY,baseY,baseR,sides,col,tw=0){for(let i=0;i<sides;i++){const a=tw+i*2*Math.PI/sides,b=tw+(i+1)*2*Math.PI/sides;triTo(dst,[0,tipY,0],[Math.cos(a)*baseR,baseY,Math.sin(a)*baseR],[Math.cos(b)*baseR,baseY,Math.sin(b)*baseR],col)}}
+function limb(dst,x0,y0,z0,x1,y1,z1,w,col){const dx=x1-x0,dz=z1-z0,ang=Math.atan2(dz,dx),len=Math.hypot(dx,dz);const ux=Math.sin(ang)*w,uz=-Math.cos(ang)*w;const p1=[x0-ux,y0,z0-uz],p2=[x0+ux,y0,z0+uz],p3=[x1+ux,y1,z1+uz],p4=[x1-ux,y1,z1-uz];triTo(dst,p1,p2,p3,col);triTo(dst,p1,p3,p4,col.map(v=>v*0.95));}
+function makeWizardMesh(friend=false){let a=[];const robe=friend?[.12,.22,.38]:[.15,.09,.20],trim=friend?[.33,.46,.67]:[.39,.12,.18],skin=friend?[.80,.66,.51]:[.63,.55,.61],metal=friend?[.61,.66,.72]:[.49,.46,.52];
+ prismBand(a,-1.22,.45,.28,.55,7,robe); prismBand(a,.45,1.40,.55,.42,7,trim,Math.PI/7); capCone(a,2.36,1.26,.64,7,robe);
+ cube(0,1.54,0,.34,.38,.31,skin); cube(-.18,1.66,.16,.09,.08,.05,[.05,.05,.06]); cube(.18,1.66,.16,.09,.08,.05,[.05,.05,.06]); cube(0,1.46,.18,.15,.05,.03,[.36,.22,.20]);
+ limb(a,-.46,1.18,0,-.78,.18,.05,.08,trim); limb(a,.46,1.18,0,.74,.14,.00,.08,trim); limb(a,-.18,-.76,0,-.18,-1.50,.02,.07,robe); limb(a,.18,-.76,0,.18,-1.50,.02,.07,robe);
+ cube(.93,.20,.05,.06,1.18,.06,[.38,.23,.08]); cube(.93,.73,.05,.18,.12,.18,metal); cube(.0,1.08,-.30,.44,.18,.30,trim.map(v=>v*0.95));
+ for(let i=0;i<7;i++){const ang=i*2*Math.PI/7;triTo(a,[0,-1.27,0],[Math.cos(ang)*.54,-.98,Math.sin(ang)*.54],[Math.cos(ang+.48)*.54,-.98,Math.sin(ang+.48)*.54],robe.map(v=>v*0.9));}
+ return a; }
+function makeDementorMesh(){let a=[];const c=[.17,.18,.24],c2=[.08,.08,.11],mist=[.32,.36,.42]; prismBand(a,-1.55,1.02,.25,.76,9,c2,Math.PI/9); capCone(a,2.24,1.00,.82,9,c); cube(0,1.28,0,.26,.32,.22,[.48,.46,.44]);
+ for(const side of [-1,1]){limb(a,side*.55,1.02,0,side*1.18,.14,.18,.10,c); limb(a,side*.30,-.10,0,side*.95,-1.20,.12,.07,c2)}
+ for(let i=0;i<8;i++){const ang=i*2*Math.PI/8;triTo(a,[0,-1.62,0],[Math.cos(ang)*.18,-.55,Math.sin(ang)*.18],[Math.cos(ang+.45)*.88,-2.30,Math.sin(ang+.45)*.88],mist.map(v=>v*range(.82,1.10)));}
+ cube(0,1.64,.12,.16,.06,.03,[.74,.74,.78]); cube(0,1.50,.18,.12,.03,.02,[.14,.07,.07]); return a; }
+function makeKnightMesh(){let a=[];const steel=[.48,.50,.55],steel2=[.25,.26,.30],cloth=[.24,.10,.12],gold=[.74,.62,.34]; prismBand(a,-1.05,.20,.38,.46,6,steel2); prismBand(a,.20,1.48,.50,.46,6,steel,Math.PI/6); cube(0,1.68,0,.48,.44,.40,steel); capCone(a,2.26,1.86,.44,6,steel2);
+ cube(0,1.48,.22,.22,.12,.05,[.06,.06,.06]); cube(0,1.30,.22,.12,.04,.03,[.30,.06,.06]); cube(-.62,1.02,0,.26,.28,.26,steel); cube(.62,1.02,0,.26,.28,.26,steel);
+ limb(a,-.54,1.00,0,-.85,.10,.00,.09,steel2); limb(a,.54,1.00,0,.86,.16,.00,.09,steel2); limb(a,-.20,-.42,0,-.24,-1.55,.03,.08,steel2); limb(a,.20,-.42,0,.24,-1.55,.03,.08,steel2);
+ cube(-1.05,.32,0,.12,1.15,.12,steel2); cube(-1.05,.92,0,.82,.76,.12,steel); cube(-1.05,.92,.09,.46,.42,.04,[.30,.16,.08]);
+ cube(.98,.20,0,.08,1.45,.08,steel2); cube(.98,1.02,0,.28,.30,.28,gold); return a; }
+function makeStalkerMesh(){let a=[];const flesh=[.30,.25,.22],fur=[.10,.09,.10],eye=[.78,.16,.11]; cube(0,.22,0,.86,.36,1.00,fur); cube(0,.44,.34,.42,.22,.42,flesh); cube(-.14,.48,.54,.09,.06,.04,eye); cube(.14,.48,.54,.09,.06,.04,eye);
+ for(const side of [-1,1]){limb(a,side*.36,.12,.24,side*1.05,-.28,.68,.05,fur); limb(a,side*.36,.10,-.08,side*1.10,-.34,-.62,.05,fur); limb(a,side*.12,.08,.44,side*.42,-.70,1.04,.05,fur); limb(a,side*.12,.06,-.30,side*.44,-.68,-1.02,.05,fur);} 
+ triTo(a,[0,.34,.78],[-.10,.26,1.06],[-.02,.16,1.00],[.92,.92,.92]); triTo(a,[0,.34,.78],[.10,.26,1.06],[.02,.16,1.00],[.92,.92,.92]);
+ return a; }
+function makeSpecterMesh(){let a=[];const c=[.22,.28,.39],glow=[.44,.62,.86],dark=[.08,.10,.13]; prismBand(a,-1.05,.65,.20,.46,7,c,Math.PI/8); capCone(a,1.95,.45,.52,7,glow); for(let i=0;i<6;i++){const ang=i*2*Math.PI/6;triTo(a,[0,-1.30,0],[Math.cos(ang)*.15,-.25,Math.sin(ang)*.15],[Math.cos(ang+.55)*.52,-2.05,Math.sin(ang+.55)*.52],c.map(v=>v*range(.88,1.08)))}
+ cube(0,1.02,.10,.10,.10,.03,[.90,.95,1]); cube(-.14,1.00,.09,.06,.06,.03,dark); cube(.14,1.00,.09,.06,.06,.03,dark); limb(a,-.36,.72,0,-.86,.10,.18,.06,glow); limb(a,.36,.72,0,.86,.10,.18,.06,glow); return a; }
+const npcFriendV=makeWizardMesh(true),npcEnemyV=makeWizardMesh(false),dementorV=makeDementorMesh(),knightV=makeKnightMesh(),stalkerV=makeStalkerMesh(),specterV=makeSpecterMesh();
 function meshBuffer(a){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);return b}
-const friendB=meshBuffer(npcFriendV),foeB=meshBuffer(npcEnemyV);
+const friendB=meshBuffer(npcFriendV),foeB=meshBuffer(npcEnemyV),dementorB=meshBuffer(dementorV),knightB=meshBuffer(knightV),stalkerB=meshBuffer(stalkerV),specterB=meshBuffer(specterV);
+function enemyMesh(e){switch(e.etype){case 'dementor':return [dementorB,dementorV.length/7,1.45,1.10];case 'knight':return [knightB,knightV.length/7,1.25,1.00];case 'stalker':return [stalkerB,stalkerV.length/7,.62,0.85];case 'specter':return [specterB,specterV.length/7,1.05,1.05];default:return [foeB,npcEnemyV.length/7,1.15,1.0];}}
 const propV=[];{let old=verts;verts=propV;cube(0,0,0,1.4,1.25,1.4,[.48,.30,.16]);cube(0,1.2,0,1.45,.14,1.45,[.62,.42,.21]);for(let side of [-1,1])cube(side*.56,.15,0,.14,1.55,1.5,[.78,.59,.32]);verts=old}
 const propB=meshBuffer(propV);
 const gateV=[];{let old=verts;verts=gateV;cube(0,0,0,4,4,.55,[.30,.21,.36]);for(let i=-1;i<=1;i++)cube(i*1.2,0,.33,.09,4,.1,[.87,.65,.39]);verts=old}const lockedB=meshBuffer(gateV);
@@ -263,7 +306,7 @@ const SPELLS=[
  {name:'Expelliarmus',glyph:'⚡',cost:18,color:[.99,.54,.31],desc:'Disarma e respinge i nemici'},
  {name:'Protego',glyph:'◇',cost:22,color:[.51,.73,1],desc:'Scudo protettivo per pochi secondi'}
 ];
-let spellIdx=0,dayTime=17*60+20,magicLight=false,spellFx=[],shield=0,broom=false,interactNear=null,regionNow='',areaTimer=0,quest={talk:false,spell:false,secret:false,train:false,school:false},wind=0;
+let spellIdx=0,dayTime=17*60+20,magicLight=false,spellFx=[],enemyBolts=[],shield=0,broom=false,interactNear=null,regionNow='',areaTimer=0,quest={talk:false,spell:false,secret:false,train:false,school:false},wind=0;
 const spellBar=$('spells');SPELLS.forEach((sp,i)=>{let b=document.createElement('button');b.className='spell';b.title=sp.name+' · '+sp.desc;b.textContent=sp.glyph;b.setAttribute('aria-label',sp.name);b.addEventListener('pointerdown',e=>{e.stopPropagation();pickSpell(i)});spellBar.appendChild(b)});
 function pickSpell(i){spellIdx=(i+SPELLS.length)%SPELLS.length;for(let j=0;j<spellBar.children.length;j++)spellBar.children[j].classList.toggle('selected',j===spellIdx);$('spellName').textContent=SPELLS[spellIdx].name+' · '+SPELLS[spellIdx].desc;spellBar.children[spellIdx].scrollIntoView({inline:'nearest',block:'nearest',behavior:'smooth'});}
 pickSpell(0);
@@ -290,21 +333,23 @@ else if(target&&target.kind){
  else if(sp.name==='Stupeficium'||sp.name==='Expelliarmus'){target.broken=true;target.vx+=nx*7;target.vy=5;target.vz+=nz*7;toast('✷ Oggetto colpito e spinto via!')}
  else toast(sp.name+'!'); newFX(cx,cy,cz,sp.color,22);
 }else if(target&&target.role&&target.role==='enemy'){
- if(sp.name==='Stupeficium'){target.stun=5;target.knock=1;target.hp-=2;toast('✷ '+target.name+' stordito!')}
- else if(sp.name==='Expelliarmus'){target.stun=2.8;target.knock=1;target.hp-=1;target.vx+=nx*10;target.vz+=nz*10;target.vy=6;toast('⚡ '+target.name+' disarmato!')}
- else if(sp.name==='Incendio'){target.hp-=2;target.stun=1;toast('🔥 '+target.name+' colpito da Incendio')}
- else if(sp.name==='Wingardium Leviosa'){target.stun=3;target.vy=7;toast('✧ '+target.name+' levita!')}
- else toast('✦ '+sp.name+'!');if(target.hp<=0){target.alive=false;target.rag=2;target.hp=0;player.kills++;toast('✨ '+target.name+' sconfitto!')}newFX(cx,cy+1,cz,sp.color,35);
+ if(sp.name==='Stupeficium'){target.stun=5;target.knock=1;target.hitFlash=.9;target.casting=0;target.windup=0;target.hp-=2;toast('✷ '+target.name+' stordito!')}
+ else if(sp.name==='Expelliarmus'){target.stun=2.8;target.knock=1;target.hitFlash=1;target.casting=0;target.windup=0;target.hp-=1;target.vx+=nx*10;target.vz+=nz*10;target.vy=6;toast('⚡ '+target.name+' disarmato!')}
+ else if(sp.name==='Incendio'){target.hp-=2;target.stun=1;target.hitFlash=1;toast('🔥 '+target.name+' colpito da Incendio')}
+ else if(sp.name==='Wingardium Leviosa'){target.stun=3;target.hitFlash=.8;target.vy=7;toast('✧ '+target.name+' levita!')}
+ else toast('✦ '+sp.name+'!');if(target.hp<=0){target.alive=false;target.rag=2.8;target.hitFlash=1;target.hp=0;player.kills++;toast('✨ '+target.name+' sconfitto!')}newFX(cx,cy+1,cz,sp.color,35);
 }else toast('✦ '+sp.name+'!');
 }
 function interact(){if(!gameStarted)return;let thing=nearestThing(5.6);if(thing===secret){if(secret.open){player.x=-31;player.z=-53;quest.school=true;toast('✧ Hai attraversato il passaggio segreto!');newFX(player.x,terrain(player.x,player.z)+2,player.z,[.95,.72,1],35)}else toast('Porta chiusa. Prova Revelio e Alohomora!');return}if(thing&&thing.role){if(thing.role==='enemy'){toast('Questo mago vuole duellare!');return}quest.talk=true;toast(thing.name+': '+(thing.line||'Che la magia sia con te!'));music(680,.3);return}if(thing&&thing.kind){if(thing.broken){toast('Puoi ripararlo con Reparo!')}else{toast('✦ Hai trovato: '+thing.name);player.mana=clamp(player.mana+12,0,100)}return}if(dist(player.x,player.z,60,-52)<15)toast('L’Hogwarts Express passa qui. Attendi il treno!');else toast('Esplora, impara magie e cerca i segreti!')}
 function toggleBroom(){if(!gameStarted)return;broom=!broom;player.vy=broom?2:0;player.air=broom?Math.max(.8,player.air||0):player.air;toast(broom?'🧹 Scopa magica! Premi ↑ per salire':'🧹 Sei tornato a terra');$('broomBadge').classList.toggle('show',broom);music(broom?840:320,.25)}
 function changeArea(name){if(regionNow===name)return;regionNow=name;$('worldArea').textContent=name;const el=$('locName');el.textContent=name;el.classList.add('show');areaTimer=3.6}
+function updateDuelTarget(){const box=$('duelTarget');if(!box)return;let nearest=null,best=17;for(const n of enemies){if(!n.alive||n.role!=='enemy')continue;let d=dist(player.x,player.z,n.x,n.z);if(d<best){best=d;nearest=n}}
+ box.classList.toggle('visible',!!nearest);if(nearest){$('duelName').textContent=nearest.name.toUpperCase();$('duelLife').style.width=Math.max(0,nearest.hp/nearest.healthMax*100)+'%';}}
 function updateMagicHUD(){const hh=(Math.floor(dayTime/60)%24),mm=Math.floor(dayTime%60);$('worldClock').textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0')+(hh<6||hh>=19?' · NOTTE':hh>=17?' · TRAMONTO':hh<11?' · MATTINO':' · GIORNO');$('manaFill').style.width=player.mana+'%';$('broomBadge').classList.toggle('show',broom);let n=nearestThing(4.8),txt=n===secret?'⚿ Passaggio segreto · ✋ interagisci':n?.role?('✋ Parla con '+n.name):n?.kind?('✦ '+n.name):'';if(n&&n.role==='enemy')txt='⚔ '+n.name+' · difenditi!';$('interaction').textContent=txt;$('interaction').classList.toggle('show',!!txt);drawMap()}
 function drawMap(){const c=$('mapCanvas'),g=c.getContext('2d');let w=200;g.clearRect(0,0,w,w);g.save();g.translate(100,100);g.rotate(-player.yaw);g.strokeStyle='#b3a48a55';for(let i=-100;i<=100;i+=20){g.beginPath();g.moveTo(i,-100);g.lineTo(i,100);g.moveTo(-100,i);g.lineTo(100,i);g.stroke()}const place=(x,z,glyph,color)=>{let X=(x-player.x)*1.7,Y=(z-player.z)*1.7;g.fillStyle=color;g.font='22px serif';g.textAlign='center';g.fillText(glyph,X,Y)};place(-31,-59,'🏰','#ffffff');place(44,20,'🏘️','#ffffff');place(72,-52,'🚂','#ffffff');for(const e of enemies)if(e.alive&&e.role==='enemy')place(e.x,e.z,'✦','#ff7777');g.restore();g.fillStyle='#fff1ac';g.beginPath();g.moveTo(100,87);g.lineTo(93,107);g.lineTo(107,107);g.closePath();g.fill()}
 
-function reset(){player={x:-8,z:-18,yaw:-.51,pitch:.06,jump:0,vy:0,vx:0,vz:0,air:0,hp:100,st:100,mana:100,kills:0,found:0};for(const r of runes)r.got=false;for(const e of enemies){e.alive=true;e.hp=e.healthMax;e.x=e.baseX;e.z=e.baseZ;e.vx=e.vz=e.vy=0;e.knock=e.rag=e.stun=0;e.talked=false}for(const p of spellProps){p.x=p.homeX;p.z=p.homeZ;p.y=terrain(p.x,p.z);p.vx=p.vy=p.vz=0;p.burn=0;p.levitate=0;p.broken=false}secret.open=secret.discovered=false;dayTime=17*60+20;magicLight=false;shield=0;broom=false;spellFx=[];quest={talk:false,spell:false,secret:false,train:false,school:false};pickSpell(0);motion.x=motion.y=0;stick.style.transform='translate(0,0)';t=0;last=performance.now();finished=false;toastTimer=0;hitCooldown=0;attackCooldown=0;updateHUD()}
-function start(){reset();gameStarted=true;$('startScreen').classList.add('hidden');$('endScreen').classList.add('hidden');hud.classList.add('active');controls.classList.toggle('active',isTouch);$('magicHud').classList.add('active');$('worldMap').classList.add('active');$('manaBox').classList.add('active');$('actionInteract').classList.toggle('active',isTouch);$('broomButton').classList.toggle('active',isTouch);changeArea(region(player.x,player.z));toast('Benvenuto. Segui il sentiero fino al castello.');if(!frameHandle)frameHandle=requestAnimationFrame(loop)}
+function reset(){player={x:-8,z:-18,yaw:-.51,pitch:.06,jump:0,vy:0,vx:0,vz:0,air:0,hp:100,st:100,mana:100,kills:0,found:0};for(const r of runes)r.got=false;for(const e of enemies){e.alive=true;e.hp=e.healthMax;e.x=e.baseX;e.z=e.baseZ;e.vx=e.vz=e.vy=0;e.knock=e.rag=e.stun=0;e.casting=e.windup=e.hitFlash=0;e.facing=Math.PI/2-e.ang;e.talked=false}for(const p of spellProps){p.x=p.homeX;p.z=p.homeZ;p.y=terrain(p.x,p.z);p.vx=p.vy=p.vz=0;p.burn=0;p.levitate=0;p.broken=false}secret.open=secret.discovered=false;enemyBolts=[];dayTime=17*60+20;magicLight=false;shield=0;broom=false;spellFx=[];quest={talk:false,spell:false,secret:false,train:false,school:false};pickSpell(0);motion.x=motion.y=0;stick.style.transform='translate(0,0)';t=0;last=performance.now();finished=false;toastTimer=0;hitCooldown=0;attackCooldown=0;updateHUD()}
+function start(){reset();gameStarted=true;$('startScreen').classList.add('hidden');$('endScreen').classList.add('hidden');hud.classList.add('active');controls.classList.toggle('active',isTouch);$('magicHud').classList.add('active');$('worldMap').classList.add('active');$('manaBox').classList.add('active');$('actionInteract').classList.toggle('active',isTouch);$('broomButton').classList.toggle('active',isTouch);changeArea(region(player.x,player.z));toast('Incantesimi e nemici rinnovati. Protego devia i colpi oscuri!');if(!frameHandle)frameHandle=requestAnimationFrame(loop)}
 function done(win){finished=true;gameStarted=false;$('endScreen').classList.remove('hidden');$('endEyebrow').textContent=win?'✦ IL DESTINO DEL REGNO ✦':'✦ L’OMBRA HA VINTO ✦';$('endSymbol').textContent=win?'✧':'☾';$('endTitle').textContent=win?'La luce è tornata':'Alohomora ti attende';$('endBody').textContent=win?'Hai aperto il passaggio e scoperto la magia!':'I maghi oscuri hanno vinto questo duello. Riprendi la bacchetta e riprova.';controls.classList.remove('active');$('magicHud').classList.remove('active');$('worldMap').classList.remove('active');$('manaBox').classList.remove('active');document.exitPointerLock?.();}
 function toast(s){$('toast').textContent=s;$('toast').classList.add('show');toastTimer=3.5}
 function music(freq=420,dur=.16,type='sine',gain=.11){if(!audioOn||!audioCtx)return;const a=audioCtx,o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(freq,a.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(70,freq*.6),a.currentTime+dur);g.gain.setValueAtTime(gain,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+dur);o.connect(g).connect(a.destination);o.start();o.stop(a.currentTime+dur)}
@@ -314,7 +359,12 @@ function jump(){if(!gameStarted||finished)return;if(broom){player.vy=5;music(470
 function matrixMul(a,b){let o=new Float32Array(16);for(let i=0;i<4;i++)for(let j=0;j<4;j++){o[i+j*4]=a[i+0*4]*b[0+j*4]+a[i+1*4]*b[1+j*4]+a[i+2*4]*b[2+j*4]+a[i+3*4]*b[3+j*4]}return o}
 function perspective(fov,aspect,n,f){let t=1/Math.tan(fov/2),m=new Float32Array(16);m[0]=t/aspect;m[5]=t;m[10]=(f+n)/(n-f);m[11]=-1;m[14]=2*f*n/(n-f);return m}
 function lookAt(e,target){let z=[e[0]-target[0],e[1]-target[1],e[2]-target[2]],l=Math.hypot(...z);z=z.map(v=>v/l);let x=[z[2],0,-z[0]];l=Math.hypot(...x);x=x.map(v=>v/l);let y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]];return new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-x[0]*e[0]-x[1]*e[1]-x[2]*e[2],-y[0]*e[0]-y[1]*e[1]-y[2]*e[2],-z[0]*e[0]-z[1]*e[1]-z[2]*e[2],1])}
-function activate(buf,N,offset,VP,eye){gl.useProgram(L.p);gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(L.aP);gl.enableVertexAttribArray(L.aC);gl.enableVertexAttribArray(L.aB);gl.vertexAttribPointer(L.aP,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(L.aC,3,gl.FLOAT,false,28,12);gl.vertexAttribPointer(L.aB,1,gl.FLOAT,false,28,24);gl.uniformMatrix4fv(L.vp,false,VP);gl.uniform3fv(L.eye,eye);gl.uniform1f(L.time,t);if(L.day)gl.uniform1f(L.day,dayBrightness);gl.uniform3fv(L.offset,offset);gl.drawArrays(gl.TRIANGLES,0,N)}
+const MAT_ID=new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+function translationM(x,y,z){let a=MAT_ID.slice();a[12]=x;a[13]=y;a[14]=z;return a}
+function rotYM(a){let c=Math.cos(a),s=Math.sin(a),m=MAT_ID.slice();m[0]=c;m[2]=-s;m[8]=s;m[10]=c;return m}
+function rotZM(a){let c=Math.cos(a),s=Math.sin(a),m=MAT_ID.slice();m[0]=c;m[1]=s;m[4]=-s;m[5]=c;return m}
+function rotXM(a){let c=Math.cos(a),s=Math.sin(a),m=MAT_ID.slice();m[5]=c;m[6]=s;m[9]=-s;m[10]=c;return m}
+function activate(buf,N,offset,VP,eye,pose=null){gl.useProgram(L.p);gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(L.aP);gl.enableVertexAttribArray(L.aC);gl.enableVertexAttribArray(L.aB);gl.vertexAttribPointer(L.aP,3,gl.FLOAT,false,28,0);gl.vertexAttribPointer(L.aC,3,gl.FLOAT,false,28,12);gl.vertexAttribPointer(L.aB,1,gl.FLOAT,false,28,24);gl.uniformMatrix4fv(L.vp,false,VP);gl.uniform3fv(L.eye,eye);gl.uniform1f(L.time,t);if(L.day)gl.uniform1f(L.day,dayBrightness);gl.uniform3fv(L.offset,offset);gl.uniformMatrix4fv(L.model,false,pose?.model||MAT_ID);gl.uniform4fv(L.rig,pose?.rig||[0,0,0,0]);gl.uniform4fv(L.damage,pose?.damage||[0,0,0,0]);gl.drawArrays(gl.TRIANGLES,0,N)}
 let dayBrightness=.8;let particlesB=gl.createBuffer(),partArr=[];
 function spark(x,y,z,r,g,b,size){partArr.push(x,y,z,r,g,b,size)}
 for(let i=0;i<300;i++){let x=range(-55,55),z=range(-65,57);let y=terrain(x,z)+range(.8,6);spark(x,y,z,range(.8,1),range(.35,.7),range(.12,.28),range(.8,2.3))}const stationarySparkCount=partArr.length;
@@ -325,8 +375,20 @@ let eye=[player.x,terrain(player.x,player.z)+1.73+player.jump+Math.sin(bob)*.04+
 activate(staticB,staticN,[0,0,0],VP,eye);
 for(const r of runes)if(!r.got){activate(runeB,runev.length/7,[r.x,terrain(r.x,r.z)+2.5+Math.sin(t*2+r.x)*.24,r.z],VP,eye)}
 
-// animated wizards, roaming civilians and enemies with simplified ragdoll response
-for(const e of enemies)if(e.alive||e.rag>0){let height=e.role==='owl'?1.7:1.15,fall=e.rag>0?-1.0*(1-e.rag/2):0;let bobN=e.stun>0?Math.sin(t*11)*.05:Math.sin(t*2.5+e.phase)*.09;activate(e.role==='enemy'?foeB:friendB,(e.role==='enemy'?npcEnemyV:npcFriendV).length/7,[e.x,terrain(e.x,e.z)+height+bobN+Math.max(0,e.vy*.05)+fall,e.z],VP,eye)}
+// Per-character animated rig: run cycle, arm spell-cast, hit recoil, fall and ground collapse.
+for(const e of enemies)if(e.alive||e.rag>0){
+ let mesh=e.role==='enemy'?enemyMesh(e):null;
+ let height=e.role==='owl'?1.7:(e.role==='enemy'?mesh[2]:1.15);
+ let velocity=Math.hypot(e.vx,e.vz),moving=clamp(velocity/2.2,0,1);
+ let dead=e.alive?0:clamp(1-e.rag/2.8,0,1),pain=clamp(e.hitFlash||0,0,1);
+ let floating=e.etype==='dementor'||e.etype==='specter';
+ let bobN=e.alive?(floating?Math.sin(t*2.1+e.phase)*.19:Math.sin(t*7.4+e.phase)*.08*moving):0;
+ let groundY=terrain(e.x,e.z)+height+bobN+Math.max(0,e.vy*.05)-(dead*.69);
+ let yaw=e.facing??(Math.PI/2-e.ang),slump=(e.etype==='stalker'?-.60:-1.42)*dead;
+ let root=matrixMul(translationM(e.x,groundY,e.z),matrixMul(rotYM(yaw),matrixMul(rotXM(slump),rotZM(Math.sin(t*10+e.phase)*pain*.24+dead*Math.sin(e.phase)*.24))));
+ let pose={model:root,rig:[t*(floating?3.5:8.5)+e.phase,moving,clamp(e.casting||0,0,1),1],damage:[pain,dead,0,0]};
+ activate(e.role==='enemy'?mesh[0]:friendB,e.role==='enemy'?mesh[1]:npcFriendV.length/7,[0,0,0],VP,eye,pose);
+}
 // interacting props governed by gravity
 for(const p of spellProps){if(!p.broken||p.broken&&dist(player.x,player.z,p.x,p.z)<50)activate(propB,propV.length/7,[p.x,p.y,p.z],VP,eye)}
 if(!secret.open)activate(lockedB,gateV.length/7,[secret.x,terrain(secret.x,secret.z)+1.9,secret.z],VP,eye);
@@ -334,9 +396,12 @@ activate(trainB,trainN,[train.x,terrain(train.x,train.z)+.5,train.z],VP,eye);
 
 const pts=partArr.slice(0,stationarySparkCount);for(let i=0;i<pts.length;i+=7){pts[i+1]+=(Math.sin(t*.9+i)*.5);pts[i+3]*=.75+.25*Math.sin(t*1.6+i)}
 for(const r of runes)if(!r.got){let h=terrain(r.x,r.z)+2.5+Math.sin(t*2+r.x)*.24;for(let j=0;j<20;j++){let a=j*.55+t*(j%2?-.9:.8),rad=.8+Math.sin(j+t)*.4;sparkLocal(pts,r.x+Math.cos(a)*rad,h+Math.sin(j*5+t)*1.1,r.z+Math.sin(a)*rad,1,.58,.18,range(.9,3.6))}sparkLocal(pts,r.x,h,r.z,1,.76,.3,8)}
-for(const e of enemies)if(e.alive){let h=terrain(e.x,e.z)+2.8+Math.sin(t*2.2+e.phase)*.5;sparkLocal(pts,e.x,h,e.z,1,.26,.43,13);for(let j=0;j<8;j++){let a=j*.8+t*1.2;sparkLocal(pts,e.x+Math.cos(a)*1.2,h+Math.sin(t*2+j)*.9,e.z+Math.sin(a)*1.2,.83,.25,.65,2.8)}}
+for(const e of enemies)if(e.alive&&e.role==='enemy'){let h=terrain(e.x,e.z)+2.8+Math.sin(t*2.2+e.phase)*.5;sparkLocal(pts,e.x,h,e.z,1,.26,.43,13);for(let j=0;j<8;j++){let a=j*.8+t*1.2;sparkLocal(pts,e.x+Math.cos(a)*1.2,h+Math.sin(t*2+j)*.9,e.z+Math.sin(a)*1.2,.83,.25,.65,2.8)}}
 if(player.found===3){for(let j=0;j<24;j++){let a=j*2*Math.PI/24+t*.13;sparkLocal(pts,Math.cos(a)*2.35,gateY+4.5+Math.sin(a)*3.1,gateZ,.56,1,.72,5)}}else{for(let j=0;j<24;j++){let a=j*2*Math.PI/24+t*.22;sparkLocal(pts,Math.cos(a)*2.35,gateY+4.5+Math.sin(a)*3.1,gateZ,.98,.31,.47,3.5)}}
 
+for(const e of enemies)if(e.alive&&e.casting>.2){let yy=terrain(e.x,e.z)+2.1;for(let j=0;j<7;j++){let aa=t*9+j*.90;sparkLocal(pts,e.x+Math.cos(aa)*.45,yy+Math.sin(aa)*.3,e.z+Math.sin(aa)*.42,1,.20,.40,3+e.casting*5)}}
+// Enemy bolts: traveling and colliding magical projectiles.
+for(const b of enemyBolts){for(let j=0;j<9;j++){let aa=t*15+j*.698;let spread=j===0?0:.20;sparkLocal(pts,b.x+Math.cos(aa)*spread,b.y+Math.sin(aa*.9)*spread,b.z+Math.sin(aa)*spread,...b.color,j===0?24:8)}}
 // spells: persistent glows, burning embers, shields, moving train chimney
 for(const f of spellFx){sparkLocal(pts,f.x,f.y,f.z,...f.color,f.size*clamp(f.life,0,1))}
 for(const p of spellProps){if(p.burn>0){for(let j=0;j<5;j++)sparkLocal(pts,p.x+Math.sin(t*8+j)*.5,p.y+.4+Math.sin(t*4+j)*.5,p.z+Math.cos(t*9+j)*.5,1,.3,.04,range(2,8))}if(p.levitate>0){sparkLocal(pts,p.x,p.y,p.z,.45,1,.85,12)}}
@@ -356,11 +421,41 @@ if(!coll(nx,player.z))player.x=nx;else player.vx=0;if(!coll(player.x,nz))player.
 if(len>.1)bob+=dt*(broom?4:sprint?17:11);else bob*=.93;
 if(broom){if(keys[' ']||keys.ArrowUp&&keys.Shift)player.vy+=13*dt;else if(keys.c||keys.ArrowDown&&keys.Shift)player.vy-=13*dt;else player.vy*=.92;player.vy=clamp(player.vy,-6,7);player.air=clamp(player.air+player.vy*dt,1,35)}else{player.vy-=18*dt;player.jump=Math.max(0,player.jump+player.vy*dt);if(player.jump===0)player.vy=0;player.air=0}
 if(keys[' ']&&!broom){keys[' ']=false;jump()}
+
+function launchEnemyBolt(n){let dx=player.x-n.x,dz=player.z-n.z,d=Math.max(.01,Math.hypot(dx,dz));let color=n.etype==='dementor'?[.56,.70,.95]:n.etype==='specter'?[.41,.81,1]:[.97,.18,.38];
+ enemyBolts.push({x:n.x,y:terrain(n.x,n.z)+(n.etype==='dementor'?2.65:1.75),z:n.z,vx:dx/d*10,vy:0,vz:dz/d*10,life:2.4,color,damage:n.etype==='dementor'?13:9,from:n.name});
+ newFX(n.x,terrain(n.x,n.z)+1.7,n.z,color,11,2.1);music(210,.22,'triangle',.025);}
+function enemyDamage(amount,from){if(shield>0){newFX(player.x,terrain(player.x,player.z)+1.5,player.z,[.45,.77,1],21,4);music(780,.14,'sine',.07);toast('◇ Protego ha deviato un attacco di '+from);return;}
+ if(hitCooldown>0)return;hitCooldown=.64;player.hp=clamp(player.hp-amount,0,100);$('redflash').style.opacity=.42;setTimeout(()=>$('redflash').style.opacity=0,180);music(118,.17,'sawtooth',.05);if(player.hp===0)done(false);}
+
 // NPC schedules: wandering, avoidance, guardian pursuit, knockback, hit reactions
-for(const n of enemies){if(!n.alive&&n.rag<=0)continue;if(n.rag>0){n.rag-=dt;n.vy-=12*dt;n.x+=n.vx*dt;n.z+=n.vz*dt;n.vx*=.94;n.vz*=.94;continue}let d=dist(player.x,player.z,n.x,n.z);n.stun=Math.max(0,n.stun-dt);n.attack=Math.max(0,n.attack-dt);if(n.stun>0){n.x+=n.vx*dt;n.z+=n.vz*dt;n.vx*=.94;n.vz*=.94;continue}
-let bx=n.baseX+Math.sin(t*.29+n.phase)*4,bz=n.baseZ+Math.cos(t*.22+n.phase)*5;let gx=bx,gz=bz;if(n.role==='enemy'&&d<17){gx=player.x;gz=player.z}let a=Math.atan2(gz-n.z,gx-n.x),speed=n.role==='enemy'?(d<18?1.9:.7):n.role==='owl'?1.4:.82;
-if(dist(gx,gz,n.x,n.z)>.6){n.vx+=(Math.cos(a)*speed-n.vx)*dt*2.8;n.vz+=(Math.sin(a)*speed-n.vz)*dt*2.8;n.x+=n.vx*dt;n.z+=n.vz*dt}
-if(n.role==='enemy'&&d<2.3&&n.attack===0){n.attack=2.4;if(shield>0){n.stun=1.5;newFX(n.x,terrain(n.x,n.z)+2,n.z,[.35,.75,1],13);toast('◇ Protego ha respinto un attacco!')}else if(hitCooldown===0){hitCooldown=1.2;player.hp=clamp(player.hp-10,0,100);$('redflash').style.opacity=.4;setTimeout(()=>$('redflash').style.opacity=0,190);music(120,.22,'sawtooth',.04);if(player.hp===0){done(false);return}}}}
+for(const n of enemies){
+ if(!n.alive&&n.rag<=0)continue;
+ if(n.rag>0){n.rag=Math.max(0,n.rag-dt);n.vy-=12*dt;n.x+=n.vx*dt;n.z+=n.vz*dt;n.vx*=Math.exp(-3.0*dt);n.vz*=Math.exp(-3.0*dt);continue;}
+ let d=dist(player.x,player.z,n.x,n.z);
+ n.hitFlash=Math.max(0,(n.hitFlash||0)-dt*2.2);
+ n.stun=Math.max(0,n.stun-dt);
+ n.attack=Math.max(0,n.attack-dt);
+ if(n.windup>0){n.windup-=dt;n.casting=clamp((n.windup+.2)*2,0,1);if(n.windup<=0){n.windup=0;if(n.alive&&n.stun===0){if(n.etype==='knight'||n.etype==='stalker') {if(d<2.9)enemyDamage(n.etype==='knight'?16:12,n.name)}else launchEnemyBolt(n)}n.casting=0;}}
+ else n.casting=Math.max(0,(n.casting||0)-dt*3);
+ if(n.stun>0){n.x+=n.vx*dt;n.z+=n.vz*dt;n.vx*=Math.exp(-5.0*dt);n.vz*=Math.exp(-5.0*dt);n.windup=0;continue;}
+ let bx=n.baseX+Math.sin(t*.29+n.phase)*4,bz=n.baseZ+Math.cos(t*.22+n.phase)*5,gx=bx,gz=bz;
+ let targetRange=n.etype==='wizard'||n.etype==='specter'||n.etype==='dementor'?7:2;
+ if(n.role==='enemy'&&d<19){gx=player.x;gz=player.z;if(d<targetRange){gx=n.x;gz=n.z}}
+ let a=Math.atan2(gz-n.z,gx-n.x),speed=n.role==='enemy'?(n.etype==='stalker'?(d<18?3.2:.95):n.etype==='knight'?(d<18?1.45:.60):n.etype==='dementor'?(d<18?1.8:.72):(d<18?1.95:.75)):n.role==='owl'?1.4:.82;
+ if(n.role==='enemy'&&d<22)n.facing=Math.atan2(player.x-n.x,player.z-n.z);
+ else n.facing=Math.atan2(Math.cos(a),Math.sin(a));
+ if(dist(gx,gz,n.x,n.z)>.6){n.vx+=(Math.cos(a)*speed-n.vx)*Math.min(1,dt*2.8);n.vz+=(Math.sin(a)*speed-n.vz)*Math.min(1,dt*2.8);n.x+=n.vx*dt;n.z+=n.vz*dt}
+ else{n.vx*=Math.exp(-4*dt);n.vz*=Math.exp(-4*dt)}
+ if(n.role==='enemy'&&n.attack===0&&n.windup===0&&d<(n.etype==='stalker'||n.etype==='knight'?2.8:13)){
+ n.attack=n.etype==='knight'?3.3:n.etype==='stalker'?2.0:2.8;
+ n.windup=n.etype==='knight'?.75:n.etype==='stalker'?.4:.64;n.casting=1;
+ }
+}
+for(let i=enemyBolts.length-1;i>=0;i--){let b=enemyBolts[i];b.life-=dt;b.x+=b.vx*dt;b.z+=b.vz*dt;
+ if(b.life<=0||Math.abs(b.x)>120||Math.abs(b.z)>140){enemyBolts.splice(i,1);continue;}
+ if(dist(b.x,b.z,player.x,player.z)<1.05&&player.air<4){enemyDamage(b.damage,b.from);newFX(b.x,b.y,b.z,b.color,17,3.5);enemyBolts.splice(i,1)}
+}
 // Dynamic rigid-body inspired lightweight props with friction, bounce, gravity and spell forces
 for(const p of spellProps){p.levitate=Math.max(0,p.levitate-dt);p.burn=Math.max(0,p.burn-dt);if(p.levitate>0){p.vy+=(2.1-p.vy)*Math.min(1,2.6*dt);p.y+=p.vy*dt; p.y=Math.min(terrain(p.x,p.z)+5.0,p.y)}else{p.vy-=14*dt;p.y+=p.vy*dt;const floor=terrain(p.x,p.z);if(p.y<floor){p.y=floor;p.vy=Math.abs(p.vy)>.5?-p.vy*.24:0}}p.x+=p.vx*dt;p.z+=p.vz*dt;let decay=Math.exp(-2.4*dt);p.vx*=decay;p.vz*=decay;p.x=clamp(p.x,-108,108);p.z=clamp(p.z,-120,80)}
 for(const fx of spellFx){fx.life-=dt;fx.x+=fx.vx*dt;fx.y+=fx.vy*dt;fx.z+=fx.vz*dt;fx.vy-=7*dt}spellFx=spellFx.filter(f=>f.life>0);
@@ -370,7 +465,7 @@ for(const r of runes){if(!r.got&&dist(player.x,player.z,r.x,r.z)<3.1){r.got=true
 // Portal becomes decorative endgame: world remains explorable rather than ending
 if(player.found===3&&dist(player.x,player.z,0,gateZ)<5&&!quest.portal){quest.portal=true;toast('✧ Portale antico risvegliato! Il mondo magico ti attende.');newFX(0,gateY+5,gateZ,[.59,1,.73],50)}
 changeArea(region(player.x,player.z));areaTimer=Math.max(0,areaTimer-dt);if(areaTimer===0)$('locName').classList.remove('show');
-uiSec+=dt;if(uiSec>.16){updateHUD();updateMagicHUD();uiSec=0}render()}
+uiSec+=dt;if(uiSec>.16){updateHUD();updateMagicHUD();updateDuelTarget();uiSec=0}render()}
 $('actionInteract').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();interact()});$('broomButton').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();toggleBroom()});$('helpBtn').addEventListener('click',()=>$('helpOverlay').classList.add('show'));$('helpClose').addEventListener('click',()=>$('helpOverlay').classList.remove('show'));$('startBtn').addEventListener('click',start);$('restartBtn').addEventListener('click',start);$('attackBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();slash()});$('jumpBtn').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();jump()});$('audioButton').addEventListener('click',()=>{audioOn=!audioOn;if(audioOn&&!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();audioCtx?.resume();$('audioButton').textContent=audioOn?'♫ AUDIO ON':'♫ AUDIO OFF';music(620,.15)});
 // Fixed virtual joystick (multitouch pointer events)
 joy.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();joyId=e.pointerId;joy.setPointerCapture(e.pointerId);joystickMove(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joystickMove(e)});function joystickMove(e){let rect=joy.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2,rx=e.clientX-cx,ry=e.clientY-cy,r=Math.min(rect.width*.36,Math.hypot(rx,ry)),a=Math.atan2(ry,rx);let dx=Math.cos(a)*r,dy=Math.sin(a)*r;motion.x=dx/(rect.width*.36);motion.y=-dy/(rect.width*.36);stick.style.left=(rect.width-54)/2+'px';stick.style.top=(rect.height-54)/2+'px';stick.style.transform='translate('+dx+'px,'+dy+'px)'}function endJoy(e){if(e.pointerId!==joyId)return;joyId=null;motion.x=motion.y=0;stick.style.transform='translate(0,0)'}joy.addEventListener('pointerup',endJoy);joy.addEventListener('pointercancel',endJoy);
@@ -378,6 +473,6 @@ joy.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();jo
 canvas.addEventListener('pointerdown',e=>{if(!gameStarted)return;if(e.pointerType==='mouse'){canvas.requestPointerLock?.();if(document.pointerLockElement===canvas)slash();else{lookId=e.pointerId;lookX=e.clientX;lookY=e.clientY}}else{lookId=e.pointerId;lookX=e.clientX;lookY=e.clientY;canvas.setPointerCapture(e.pointerId)}});
 canvas.addEventListener('pointermove',e=>{if(!gameStarted||lookId!==e.pointerId||document.pointerLockElement===canvas)return;let dx=e.clientX-lookX,dy=e.clientY-lookY;lookX=e.clientX;lookY=e.clientY;player.yaw+=dx*.0052;player.pitch=clamp(player.pitch-dy*.0037,-.85,.8)});canvas.addEventListener('pointerup',e=>{if(lookId===e.pointerId)lookId=null});canvas.addEventListener('pointercancel',()=>lookId=null);document.addEventListener('mousemove',e=>{if(document.pointerLockElement===canvas&&gameStarted){player.yaw+=e.movementX*.003;player.pitch=clamp(player.pitch-e.movementY*.0025,-.85,.8)}});document.addEventListener('mousedown',e=>{if(e.button===0&&document.pointerLockElement===canvas)slash()});document.addEventListener('keydown',e=>{if([' ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();keys[e.key.length===1?e.key.toLowerCase():e.key]=true;if(e.key==='Escape'&&document.pointerLockElement)document.exitPointerLock();if(!e.repeat&&gameStarted){if(e.key.toLowerCase()==='b')toggleBroom();if(e.key.toLowerCase()==='f')interact();if(e.key==='q')pickSpell(spellIdx-1);if(e.key==='e')pickSpell(spellIdx+1);if(e.key>='1'&&e.key<='9')pickSpell(Number(e.key)-1);if(e.key==='0')pickSpell(9)}});document.addEventListener('keyup',e=>keys[e.key.length===1?e.key.toLowerCase():e.key]=false);document.addEventListener('visibilitychange',()=>{last=performance.now()});document.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('resize',()=>{canvas.width=0});
 // Render a living valley behind the title screen
-reset();render();let backdropTimer=0;function animateBackdrop(){if(gameStarted)return;t+=.024;player.yaw=-.51+Math.sin(t*.22)*.07;render();backdropTimer=requestAnimationFrame(animateBackdrop)}animateBackdrop();
+reset();render();let backdropTimer=0;function animateBackdrop(){if(gameStarted)return;t+=.024;player.yaw=Math.sin(t*.22)*.07;render();backdropTimer=requestAnimationFrame(animateBackdrop)}animateBackdrop();
 })();
 </script></body></html>
