@@ -1,4 +1,4 @@
-/* RAGDOLL LAB v0.5 — standalone original web game. Three.js is used as an external rendering library. */
+/* RAGDOLL LAB v1.0 — standalone original web game. Three.js is used as an external rendering library. */
 let THREE;
 try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js'); }
 catch (error) {
@@ -116,6 +116,9 @@ function attach(part,geom,mat,scale,pos){const o=mesh(geom,mat,part);o.scale.set
 function mesh(geom,mat,group=world){const m=new THREE.Mesh(geom,mat);m.castShadow=true;m.receiveShadow=true;group.add(m);return m}
 function box(x,y,z,w,h,d,mat=materials.wall,group=world){const m=mesh(cube,mat,group);m.position.set(x,y,z);m.scale.set(w,h,d);return m}
 function lightbar(x,y,z,w=2.8){box(x,y,z,w,.065,.21,materials.lightStrip);box(x,y+.11,z,w+.2,.11,.34,materials.black)}
+const {createPremium}=await import('./premium.js');
+const premium=createPremium({THREE,renderer,scene,world,bodies,effects,materials,camera,mesh,box});
+premium.applyQuality('auto');
 function sign(text,x,y,z,color='#9df2e9',size=.62){
   const c=document.createElement('canvas');c.width=512;c.height=128;const ct=c.getContext('2d');
   ct.fillStyle='#09151c';ct.fillRect(0,0,512,128);ct.strokeStyle='#477077';ct.lineWidth=6;ct.strokeRect(4,4,504,120);
@@ -265,6 +268,7 @@ function buildArena(mode){
     box(0,2.63,-6,3.6,.17,3.9,materials.steel);
     lightbar(0,2.48,-6,2.3);
   }
+  premium.addArena(mode);
 }
 const jointTemplate=[
   [0,1.86,0], [0,1.57,0], [0,1.30,0], [0,.97,0],
@@ -360,6 +364,7 @@ function makeDummy(x,z,y=0,isEnemy=false){
     m.visible=xrOn;anatomy.push({organ,m,offset:pos});
   }
   d.anatomy=anatomy;
+  premium.enhanceDummy(d);
   dummies.push(d);pose(d);return d;
 }
 function pose(d){
@@ -373,7 +378,7 @@ function pose(d){
   d.head.position.copy(pts[0]);
   d.visor.position.copy(pts[0]).add(V(0,-.016,.224));
   d.torso.position.copy(pts[1]).lerp(pts[3],.49);
-  d.torso.scale.y=.38+(!d.physics?.006*Math.sin(performance.now()*.0021+d.phase):0);
+  d.torso.scale.y=(d.details?1:.38)+(!d.physics?.009*Math.sin(performance.now()*.0021+d.phase):0);
   d.pelvis.position.copy(pts[3]);
   d.jacket.position.copy(d.torso.position);
   d.jacket.quaternion.setFromUnitVectors(up,tempA.subVectors(pts[1],pts[3]).normalize());
@@ -394,6 +399,7 @@ function pose(d){
     wound.mesh.position.z+=wound.front;
     wound.mesh.rotation.z=wound.twist;
   }
+  premium.updateDummy(d,performance.now());
 }
 function animateLiving(d,time){
   if(d.physics)return;
@@ -778,6 +784,7 @@ function hitPhysics(d,point,index,dir,damage,force,bleedScale,kind){
     registerHitReaction(d,index,dir,damage);
   }
   bloodBurst(point,dir,Math.min(13,Math.ceil(damage/8)+2));
+  premium.onImpact(d,point,damage);
   if(d.life<=0&&prevLife>0){
     say(d.enemy?'BERSAGLIO NEUTRALIZZATO · '+score:'SEGNI VITALI ASSENTI',1250);
   }else if(!d.enemy){say(zoneOf(index)+' · '+Math.round(d.life)+'% integrità',700)}
@@ -826,7 +833,7 @@ function action(){
   if(tool==='grenade'){
     const hit=rayTarget(80);
     const pos=hit?hit.point.clone():camera.position.clone().addScaledVector(baseDir,10);
-    tracer(start,pos,tool);detonate(pos,baseDir);updateHud(hit?.d);return;
+    tracer(start,pos,tool);premium.onShot(tool,hit,pos,baseDir);detonate(pos,baseDir);updateHud(hit?.d);return;
   }
   let target=null;
   for(let i=0;i<weapon.pellets;i++){
@@ -834,6 +841,7 @@ function action(){
     const hit=rayTarget(80,dir);
     const point=hit?hit.point.clone():camera.position.clone().addScaledVector(dir,56);
     if(i===0||tool==='shotgun'&&i%2===0)tracer(start,point,tool);
+    if(i===0)premium.onShot(tool,hit,point,dir);
     if(hit){
       const damage=hit.i===0?weapon.damage*1.55:weapon.damage;
       hitPhysics(hit.d,hit.point,hit.i,dir,damage,weapon.push,weapon.bleed,'FERITA');
@@ -1006,6 +1014,7 @@ function tick(time){
       animateLiving(d,time);simulate(d,dt);medicalTick(d,dt);pose(d);
     }
     updateEffects(dt);
+    premium.renderFrame(dt,time);
     if((Math.floor(time/150)%4)===0){
       const target=rayTarget(75);
       if(target&&target.d)updateHud(target.d);
