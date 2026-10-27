@@ -1,0 +1,19 @@
+{
+  "name": "GBR Web Sandbox",
+  "short_name": "GBR Web",
+  "description": "Sandbox 3D indipendente e giocabile su iPhone",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0c151d",
+  "theme_color": "#0c151d",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
