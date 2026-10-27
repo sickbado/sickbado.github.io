@@ -156,7 +156,9 @@ let health=100,wave=0,score=0,nextWaveAt=0,shake=0,lastShot=0,lastTime=0;
 const tempA=V(),tempB=V(),tmp=V(),ray=new THREE.Ray(),up=V(0,1,0);
 function makeDummy(x,z,y=0,isEnemy=false){
   const d={points:[],prev:[],constraints:[],parts:[],life:100,alive:true,physics:false,
-    enemy:isEnemy,base:V(x,y,z),phase:Math.random()*6.28,hitCount:0,deathAt:0};
+    enemy:isEnemy,base:V(x,y,z),phase:Math.random()*6.28,hitCount:0,deathAt:0,
+    blood:100,bleed:0,organs:{brain:100,heart:100,lungs:100,liver:100},
+    fractures:0,injuries:[],maxHeight:y+1.9,fallRegistered:false,poolTimer:0};
   d.points=jointTemplate.map(([px,py,pz])=>V(x+px,y+py,z+pz));
   d.prev=d.points.map(p=>p.clone());
   for(const [a,b,r] of bones){ if(!r) continue;
@@ -226,6 +228,63 @@ function impulse(d,index,strength,dir){
     const nearness=Math.max(0,1-p.distanceTo(d.points[k])/1.6);
     d.prev[k].addScaledVector(dir,-strength*.012*nearness);
   }
+}
+function zoneOf(index){
+  if(index===0)return 'TESTA';
+  if(index===1||index===2)return 'TORACE';
+  if(index===3)return 'ADDOME';
+  if(index<=9)return 'ARTI SUPERIORI';
+  return 'ARTI INFERIORI';
+}
+function addTrauma(d,amount,index,kind='IMPATTO'){
+  amount=Math.max(0,amount);if(amount===0)return;
+  const zone=zoneOf(index);
+  const organ=zone==='TESTA'?'brain':zone==='TORACE'?(index===1?'lungs':'heart'):zone==='ADDOME'?'liver':null;
+  let severity=amount;
+  if(organ){
+    d.organs[organ]=Math.max(0,d.organs[organ]-amount*(organ==='brain'?1.35:organ==='heart'?1.2:.7));
+    if(d.organs.brain<=5||d.organs.heart<=5)d.life=0;
+  }
+  if(zone==='ARTI INFERIORI'||zone==='ARTI SUPERIORI'){
+    if(amount>25)d.fractures++;
+    severity*=.65;
+  }
+  d.life=Math.max(0,d.life-severity);
+  const baseBleed=kind==='CADUTA'?.015:kind==='SHOCK'?.03:.065;
+  d.bleed=Math.min(9,d.bleed+amount*baseBleed*(zone==='TORACE'||zone==='ADDOME'?1.3:1));
+  d.hitCount++;
+  d.injuries.unshift(kind+' · '+zone+' · '+Math.round(amount)+' trauma');
+  if(d.injuries.length>7)d.injuries.length=7;
+  if(d.life<=0&&d.alive){
+    d.alive=false;d.deathAt=performance.now();d.physics=true;
+    if(d.enemy)score++;
+  }
+}
+function medicalTick(d,dt){
+  if(d.physics){
+    const elevation=d.points[3].y;
+    d.maxHeight=Math.max(d.maxHeight,elevation);
+    if(!d.fallRegistered&&d.maxHeight>4&&elevation<1.06){
+      const trauma=Math.min(98,(d.maxHeight-1)*7.8);
+      d.fallRegistered=true;addTrauma(d,trauma,3,'CADUTA');
+      bloodBurst(d.points[3],V(0,1,0),Math.min(30,Math.ceil(trauma/4)));
+    }
+  }
+  if(d.bleed>0&&d.blood>0){
+    d.blood=Math.max(0,d.blood-d.bleed*dt*.7);
+    if(d.blood<65)d.life=Math.max(0,d.life-dt*(65-d.blood)*.017);
+    if(d.blood<22)d.life=0;
+    d.poolTimer+=dt*d.bleed;
+    if(d.poolTimer>.95){
+      d.poolTimer=0;
+      const p=d.points[3],ground=floorAt(p.x,p.z);
+      const stain=mesh(new THREE.CircleGeometry(.10+Math.random()*.20,12),materials.blood,effects);
+      stain.rotation.x=-Math.PI/2;stain.position.set(p.x,ground+.018+Math.random()*.004,p.z);
+      decals.push({m:stain,life:18,fade:0});
+      if(decals.length>75){let old=decals.shift();effects.remove(old.m);old.m.geometry.dispose();}
+    }
+  }
+  if(d.life<=0&&d.alive){d.alive=false;d.physics=true;if(d.enemy)score++;}
 }
 function spawnForMode(){
   dummies.forEach(d=>{d.parts.forEach(o=>bodies.remove(o.m));bodies.remove(d.head,d.visor);d.joints.forEach(([,m])=>bodies.remove(m))});
@@ -499,7 +558,7 @@ function updateEffects(dt){
     if(p.life<=0){effects.remove(p.m);p.m.geometry!==sphere&&p.m.geometry.dispose();particles.splice(i,1)}
   }
   for(let i=decals.length-1;i>=0;i--){
-    const p=decals[i];p.life-=dt;p.m.material.opacity=Math.max(0,p.life/.1);
+    const p=decals[i];p.life-=dt;if(p.fade)p.m.material.opacity=Math.max(0,p.life/.1);
     if(p.life<=0){effects.remove(p.m);p.m.geometry.dispose();p.m.material.dispose();decals.splice(i,1);}
   }
 }
@@ -515,7 +574,7 @@ function tick(time){
     }
     updateEnemies(dt,time);
     for(const d of dummies){
-      simulate(d,dt);pose(d);
+      simulate(d,dt);medicalTick(d,dt);pose(d);
     }
     updateEffects(dt);
     if((Math.floor(time/150)%4)===0){
