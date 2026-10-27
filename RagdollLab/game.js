@@ -70,7 +70,7 @@ function buildArena(mode){
   box(0,5,-17,30,10,.5,materials.wall2);
   box(-15,4,-1,.55,8,34,materials.wall);
   box(15,4,-1,.55,8,34,materials.wall);
-  box(0,8.15,-1,30,.3,34,materials.wall2);
+  if(mode!=='tower') box(0,8.15,-1,30,.3,34,materials.wall2);
   box(0,3.9,15.5,30,7,.25,materials.wall);
   // Structural beams, concrete panels and fluorescent fixtures
   for(let z=-14;z<=12;z+=6){
@@ -393,7 +393,7 @@ function startGame(newMode){
   if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 }
 function reset(){held=null;buildArena(mode);spawnForMode();changeTool('pistol')}
-function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';fireHeld=false;
+function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';$('#rotate').classList.add('off');fireHeld=false;
   if(document.pointerLockElement)document.exitPointerLock();}
 $$('.modebtn').forEach(btn=>btn.addEventListener('click',()=>{
   $$('.modebtn').forEach(b=>b.classList.toggle('active',b===btn));
