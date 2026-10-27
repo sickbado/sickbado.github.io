@@ -945,7 +945,7 @@ function startGame(newMode){
   premium.applyQuality(qualityChoice);
   for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
   reloading='';lastShot=-100000;setAim(false);refreshAmmo();
-  $('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');
+  try{$('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');}catch(error){window.__ragdollReport?.(error);throw error;}
   if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 }
 function reset(){held=null;reloading='';for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;buildArena(mode);spawnForMode();changeTool('pistol');updateHud()}
