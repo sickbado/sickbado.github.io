@@ -1,4 +1,4 @@
-/* RAGDOLL LAB v0.4 — standalone original web game. Three.js is used as an external rendering library. */
+/* RAGDOLL LAB v0.5 — standalone original web game. Three.js is used as an external rendering library. */
 let THREE;
 try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js'); }
 catch (error) {
@@ -288,7 +288,8 @@ function makeDummy(x,z,y=0,isEnemy=false){
   const d={points:[],prev:[],constraints:[],parts:[],life:100,alive:true,physics:false,
     enemy:isEnemy,base:V(x,y,z),phase:Math.random()*6.28,hitCount:0,deathAt:0,
     blood:100,bleed:0,organs:{brain:100,heart:100,lungs:100,liver:100},
-    fractures:0,injuries:[],maxHeight:y+1.9,fallRegistered:false,poolTimer:0,wounds:[],reaction:0,reactionTime:0};
+    fractures:0,injuries:[],maxHeight:y+1.9,fallRegistered:false,poolTimer:0,wounds:[],
+    reaction:0,reactionTime:0,hitIndex:2,hitDirection:V(0,0,-1),balance:100,limp:0};
   d.walkDistance=0;d.facing=0;d.hasWalk=false;d.skin=isEnemy?materials.deadSkin:(Math.random()<.55?materials.skin:materials.skin2);
   d.points=jointTemplate.map(([px,py,pz])=>V(x+px,y+py,z+pz));
   d.prev=d.points.map(p=>p.clone());
@@ -403,17 +404,35 @@ function animateLiving(d,time){
   const sway=Math.sin(t*1.55+d.phase);
   const bounce=running?Math.abs(stride)*.037:Math.sin(t*2+d.phase)*.008;
   const turn=d.facing||0,cs=Math.cos(turn),sn=Math.sin(turn);
+  const since=Math.max(0,(time-d.reactionTime)/1000);
+  const flinch=d.reaction*Math.exp(-since*7);
+  if(flinch<.005)d.reaction=0;
+  const knock=Math.sin(Math.min(1,since/.26)*Math.PI)*flinch;
+  const legInjury=d.limp||0;
+  const injuredLeg=d.hitIndex>=13?1:-1;
   for(let i=0;i<jointTemplate.length;i++){
     let [x,y,z]=jointTemplate[i];
     if(i===0){x+=.009*sway;z+=.014*sway;}
     if(i===1||i===2){y+=bounce;z+=.012*sway;}
     if(i===3){x+=.013*sway;}
     if(i===4||i===7){y+=bounce;z+=running?.035*stride*(i===4?-1:1):0;}
-    if(i===5||i===8){z+=(running?.25: .033)*stride*(i===5?-1:1)+(d.enemy?.26:0);y+=running?.01:0;}
+    if(i===5||i===8){z+=(running?.25:.033)*stride*(i===5?-1:1)+(d.enemy?.26:0);}
     if(i===6||i===9){z+=(running?.37:.027)*stride*(i===6?-1:1)+(d.enemy?.48:0);y+=d.enemy?.04:0;}
-    if(i===11||i===14){const strideDirection=(i===11?1:-1);z+=stride*strideDirection*.21;y+=Math.max(0,stride*strideDirection)*.06;}
-    if(i===12||i===15){const strideDirection=(i===12?1:-1);z+=stride*strideDirection*.34;y+=Math.max(0,stride*strideDirection)*.19;}
+    if(i===11||i===14){
+      const side=i===11?1:-1;
+      z+=stride*side*.21;y+=Math.max(0,stride*side)*.06;
+      if(side===injuredLeg){z*=1-legInjury*.6;y-=legInjury*.035;}
+    }
+    if(i===12||i===15){
+      const side=i===12?1:-1;
+      z+=stride*side*.34;y+=Math.max(0,stride*side)*.19;
+      if(side===injuredLeg){z*=1-legInjury*.6;y-=legInjury*.065;}
+    }
     if(i===10||i===13)y+=bounce;
+    // No ballistic teleport: all flinching is constrained to centimetres.
+    if(i<=3){z-=knock*.075;x+=knock*.018*(d.hitIndex<4?1:-1);}
+    else if(i<=9){z-=knock*.07;}
+    if(i===0){z-=knock*.055;y-=knock*.026;}
     d.points[i].set(d.base.x+x*cs+z*sn,d.base.y+y+bounce*(i===0?.4:0),d.base.z-x*sn+z*cs);
     d.prev[i].copy(d.points[i]);
   }
@@ -453,15 +472,31 @@ function simulate(d,dt){
     }
   }
 }
+// A gunshot is not an explosion: keep projectile momentum small relative to body mass.
+// Incoming bullet transfers pain and local recoil; it never enables full ragdoll by itself.
 function impulse(d,index,strength,dir){
-  d.physics=true;
-  const p=d.points[index],q=d.prev[index];
-  q.addScaledVector(dir,-strength*.018);
+  if(!d.physics)return;
+  const displacement=THREE.MathUtils.clamp(strength*.00065,0,.12);
+  const center=d.points[3];
   for(let k=0;k<d.points.length;k++){
-    if(k===index) continue;
-    const nearness=Math.max(0,1-p.distanceTo(d.points[k])/1.6);
-    d.prev[k].addScaledVector(dir,-strength*.012*nearness);
+    const near=Math.max(.22,1-center.distanceTo(d.points[k])/2.4);
+    d.prev[k].addScaledVector(dir,-displacement*near);
   }
+  // Small additional rotation near the impact point; prevents launching the entire body.
+  const impact=d.prev[index];
+  if(impact)impact.addScaledVector(dir,-displacement*.12);
+}
+function registerHitReaction(d,index,dir,damage){
+  if(d.physics)return;
+  // Fast flinch, fading over ~0.55 s. Heavier hits are more visible, not more airborne.
+  const localStrength=THREE.MathUtils.clamp(damage/70,.12,.78);
+  d.reaction=Math.max(d.reaction,localStrength);
+  d.reactionTime=performance.now();
+  d.hitIndex=index;
+  d.hitDirection.copy(dir).setY(0);
+  if(d.hitDirection.lengthSq()>0.001)d.hitDirection.normalize();
+  if(index>=10 && damage>=19){d.limp=Math.min(.75,d.limp+.22);}
+  d.balance=Math.max(0,d.balance-damage*(index>=10?.7:.20));
 }
 function zoneOf(index){
   if(index===0)return 'TESTA';
@@ -481,7 +516,7 @@ function addTrauma(d,amount,index,kind='IMPATTO'){
   amount=Math.max(0,amount);if(amount===0)return;
   const zone=zoneOf(index);
   if(kind==='FERITA'||kind==='ESPLOSIONE')createWound(d,index,amount);
-  d.reaction=Math.min(1,d.reaction+amount*.01);d.reactionTime=performance.now();
+  // Hit reaction is scheduled by hitPhysics, based on shot direction and body region.
   const organ=zone==='TESTA'?'brain':zone==='TORACE'?(index===1?'lungs':'heart'):zone==='ADDOME'?'liver':null;
   let severity=amount;
   if(organ){
@@ -720,10 +755,21 @@ function shotRay(direction){
 }
 function hitPhysics(d,point,index,dir,damage,force,bleedScale,kind){
   const prevLife=d.life;
+  const beforePhysics=d.physics;
   addTrauma(d,damage,index,kind);
   d.bleed=Math.min(9,d.bleed+damage*.018*bleedScale);
-  impulse(d,index,force,dir);
-  bloodBurst(point,dir,Math.min(26,Math.ceil(damage/3)+4));
+  // Blast shockwaves can actually knock someone down; normal rounds cannot.
+  if(kind==='ESPLOSIONE' && damage>22 && !d.physics){
+    d.physics=true;
+  }
+  if(d.physics){
+    // When incapacitation activates ragdoll, start from the current pose.
+    if(!beforePhysics)d.prev.forEach((prev,i)=>prev.copy(d.points[i]));
+    impulse(d,index,kind==='ESPLOSIONE'?Math.min(force,190):Math.min(force,125),dir);
+  }else{
+    registerHitReaction(d,index,dir,damage);
+  }
+  bloodBurst(point,dir,Math.min(13,Math.ceil(damage/8)+2));
   if(d.life<=0&&prevLife>0){
     say(d.enemy?'BERSAGLIO NEUTRALIZZATO · '+score:'SEGNI VITALI ASSENTI',1250);
   }else if(!d.enemy){say(zoneOf(index)+' · '+Math.round(d.life)+'% integrità',700)}
