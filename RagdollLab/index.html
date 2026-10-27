@@ -2,7 +2,7 @@
 <html lang="it"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#090f17"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ragdoll Lab"><meta name="description" content="Ragdoll Lab 0.5: sandbox fisico 3D con animazioni, armi e diagnostica medica su iPhone.">
+<meta name="apple-mobile-web-app-title" content="Ragdoll Lab"><meta name="description" content="Ragdoll Lab 1.0: simulatore fisico 3D con animazioni, armi e diagnostica medica su iPhone.">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>RAGDOLL LAB | Injury Simulation</title>
 <style>
@@ -92,12 +92,47 @@ h1 em{color:#71eee1;font-style:normal}
 #medical{z-index:2;border:1px solid rgba(126,239,222,.48);box-shadow:0 14px 30px #0009}
 #injuries{min-height:27px}
 @media(max-height:470px){#toolbar{min-height:46px}.tool{height:42px;min-width:45px;font-size:9px;padding:2px 5px}.tool span{font-size:14px}#top .brand{font-size:11px}#upperBtns{right:9px;gap:4px}.smallBtn{padding:6px 7px;font-size:9px}#medical{right:9px;width:185px}}
+
+/* Shipping interface: legible diagnostics, HUD, touch-first controls */
+#ammoHUD{display:flex;align-items:center;gap:7px;min-width:150px;margin-top:10px}
+#ammoHUD b{font-size:24px;font-variant-numeric:tabular-nums;color:#f5fbf6;line-height:1}
+#ammoHUD small{font-size:9px;max-width:64px;line-height:1.25;color:#9cb4bf}
+#reloadHUD{color:#d5f7f3;background:#132e38;border:1px solid #335d64;font-weight:800;font-size:10px;letter-spacing:.02em;border-radius:6px;padding:7px}
+#aim{width:55px;height:55px;font-size:10px;color:#bffcf3}
+#aim.active{background:#376a65;border-color:#aefaf0;color:#fff;box-shadow:0 0 16px #24b0a866}
+.qualityPicker{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:3px 0 14px}
+.qualityPicker>span{font-size:9px;font-weight:900;letter-spacing:.13em;margin-right:5px;color:#a4beca}
+.qualityOption{border:1px solid #2b4a56;border-radius:7px;background:#172b35;padding:8px 10px;font-size:10px;letter-spacing:.02em;font-weight:850;color:#b1ccd5}
+.qualityOption.active{border-color:#6aeada;color:#092e38;background:#7ee7d8}
+#top,.vitals,#upperBtns,#health,#toolbar,#actionArea{z-index:1}
+#medical{z-index:3}
+#toolbar{padding-bottom:6px;max-width:min(91vw,700px)}
+#hint{z-index:2;top:24%;font-size:12px}
+@media(max-height:470px){
+ #healthbar{width:95px}
+ #ammoHUD{margin-top:4px}
+ #ammoHUD b{font-size:16px}
+ #reloadHUD{font-size:8px;padding:4px}
+ #ammoHUD small{font-size:8px}
+ #aim{width:48px;height:48px}
+ #grab{width:49px;height:49px}
+ #fire{width:75px;height:75px}
+ #actionArea{gap:7px;bottom:63px}
+ #health{left:11px}
+ #upperBtns{top:43px}
+ #toolbar{max-width:70vw}
+}
+@media(max-width:700px) and (orientation:portrait){
+ .qualityPicker{justify-content:center}
+}
 </style></head><body>
 <canvas id="game"></canvas>
 <div id="overlay">
-  <div id="top"><div><div class="brand">RAGDOLL LAB <span style="color:#6c8493;font-weight:600">/ MOBILE</span></div><span class="tiny">RESEARCH FACILITY · PROTOTIPO 0.5</span></div><div class="vitals">BERSAGLIO <b id="targetHealth">100%</b><br><span id="targetState">INTEGRITÀ STRUTTURALE</span></div></div>
-  <div id="health">OPERATORE <span id="mode">SANDBOX</span><div id="healthbar"><div id="healthFill"></div></div></div>
-  <div id="upperBtns"><button class="smallBtn" id="medButton">♡ ANATOMIA</button><button class="smallBtn" id="xrButton">◎ RX</button><button class="smallBtn" id="reset">↻ RIPRISTINA</button><button class="smallBtn" id="menu">☰ MENU</button></div>
+  <div id="top"><div><div class="brand">RAGDOLL LAB <span style="color:#6c8493;font-weight:600">/ MOBILE</span></div><span class="tiny">RESEARCH FACILITY · EDIZIONE 1.0</span></div><div class="vitals">BERSAGLIO <b id="targetHealth">100%</b><br><span id="targetState">INTEGRITÀ STRUTTURALE</span></div></div>
+  <div id="health">OPERATORE <span id="mode">SANDBOX</span><div id="healthbar"><div id="healthFill"></div></div>
+ <div id="ammoHUD"><b id="ammoNumber">15</b><small id="ammoName">9MM · 15 COLPI</small><button id="reloadHUD">↻ RICARICA</button></div>
+</div>
+  <div id="upperBtns"><button class="smallBtn" id="qualityBtn">◈ AUTO</button><button class="smallBtn" id="medButton">♡ ANATOMIA</button><button class="smallBtn" id="xrButton">◎ RX</button><button class="smallBtn" id="reset">↻ RIPRISTINA</button><button class="smallBtn" id="menu">☰ MENU</button></div>
 
   <aside id="medical"><button id="medClose">✕</button><h3>DIAGNOSTICA / SOGGETTO</h3>
   <div class="metric"><span>Stato</span><b id="medState">STABILE</b></div>
@@ -111,7 +146,7 @@ h1 em{color:#71eee1;font-style:normal}
   <div id="xrOverlay"><svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg"><circle class="bone" cx="60" cy="22" r="15"/><path class="bone" d="M60 40V122 M60 48L34 71L25 111 M60 48L86 71L95 111 M60 116L42 148L38 188 M60 116L78 148L82 188 M43 64L76 64 M44 86L75 86 M46 98L73 98"/><ellipse id="xBrain" class="organ brain" cx="60" cy="22" rx="11" ry="10"/><ellipse id="xLungs" class="organ lungs" cx="48" cy="73" rx="11" ry="19"/><ellipse class="organ lungs" cx="72" cy="73" rx="11" ry="19"/><ellipse id="xHeart" class="organ" cx="61" cy="80" rx="7" ry="9"/><ellipse id="xLiver" class="organ liver" cx="65" cy="103" rx="15" ry="9"/></svg></div>
   <div id="hint" role="status"></div><div id="cross"><i></i></div>
   <div id="stick"><div id="knob"></div></div>
-  <div id="actionArea"><button id="grab" class="action">AGGANCIA</button><button id="fire" class="action">●</button></div>
+  <div id="actionArea"><button id="grab" class="action">AGGANCIA</button><button id="aim" class="action">MIRA</button><button id="fire" class="action">●</button></div>
   <div id="toolbar">
     <button class="tool active" data-tool="pistol"><span>⌖</span>9 MM</button>
     <button class="tool" data-tool="smg"><span>↣</span>SMG</button>
@@ -122,7 +157,7 @@ h1 em{color:#71eee1;font-style:normal}
     <button class="tool" data-tool="physics"><span>◇</span>FISICA</button>
     <button class="tool" data-tool="drop"><span>↓</span>CADUTA</button>
   </div>
-  <div id="desktopHint">WASD muovi · Trascina per guardare · Clic per agire · 1–8 strumenti · R ripristina</div>
+  <div id="desktopHint">WASD movimento · trascina per mirare · clic spara · F ricarica · Shift mira · R ripristina</div>
 </div>
 <div id="home"><div class="homeCard">
   <div class="code">UNITÀ DI SIMULAZIONE / RL-01</div>
@@ -134,7 +169,11 @@ h1 em{color:#71eee1;font-style:normal}
     <button class="modebtn" data-mode="tower"><span class="emoji">🏗️</span><strong>TORRE 16 M</strong><small>Cadute · gravità e impatti</small></button>
     <button class="modebtn" data-mode="zombies"><span class="emoji">⚠️</span><strong>ONDATE</strong><small>Survival · bersagli in movimento</small></button>
   </div>
-  <button id="launch">ENTRA NEL LABORATORIO →</button>
+  <div class="qualityPicker"><span>GRAFICA IPHONE</span>
+<button data-quality="auto" class="qualityOption active">AUTOMATICA</button>
+<button data-quality="alta" class="qualityOption">QUALITÀ</button>
+<button data-quality="fluida" class="qualityOption">FLUIDITÀ</button></div>
+<button id="launch">ENTRA NEL LABORATORIO →</button>
   <p class="legal">Progetto indipendente originale, ispirato al genere ragdoll sandbox. Non è Project C.A.R.L. né una sua conversione ufficiale. Ruota l'iPhone in orizzontale per giocare meglio.</p>
 </div></div>
 <div id="rotate" class="off"><div><strong>↻</strong>RUOTA L'IPHONE IN ORIZZONTALE<br><small style="color:#86a0ac;font-weight:400">Per visualizzare il laboratorio e i comandi di gioco.</small></div></div>
