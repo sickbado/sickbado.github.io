@@ -327,18 +327,27 @@ function makeGun(){
   box(.24,-.04,-.62,.05,.04,.3,materials.teal,gun);
 }
 makeGun();
+const weapons={
+ pistol:{label:'9 mm · pistola semiautomatica',cooldown:310,damage:21,push:46,spread:.005,pellets:1,automatic:false,sound:160,bleed:1},
+ smg:{label:'SMG · colpi rapidi',cooldown:85,damage:10,push:23,spread:.028,pellets:1,automatic:true,sound:220,bleed:.7},
+ rifle:{label:'AK · automatico',cooldown:135,damage:29,push:56,spread:.018,pellets:1,automatic:true,sound:115,bleed:1.2},
+ sniper:{label:'.308 · alta penetrazione',cooldown:980,damage:72,push:128,spread:.002,pellets:1,automatic:false,sound:65,bleed:2.2},
+ shotgun:{label:'Fucile a pompa · rosata ravvicinata',cooldown:740,damage:14,push:37,spread:.115,pellets:8,automatic:false,sound:84,bleed:1.5},
+ grenade:{label:'Granata · esplosione localizzata',cooldown:1300,damage:90,push:158,spread:0,pellets:1,automatic:false,sound:48,bleed:2}
+};
 function changeTool(name){
   tool=name;held=null;
   $$('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
-  const info={pistol:'Pistola · colpo singolo',rifle:'Fucile · raffica automatica',
-    physics:'Physics gun · aggancia o lascia il bersaglio',impact:'Impulso · spinta ad alta energia',
-    drop:'Caduta · libera il manichino'};
-  say(info[name],1600);
+  const info={physics:'Physics gun · aggancia o lascia il bersaglio',drop:'Caduta · libera il manichino'};
+  say(weapons[name]?.label||info[name]||'',1850);
   gun.children.forEach(m=>{if(m.material===materials.teal)m.visible=(name==='physics')});
+  const long=name==='sniper'||name==='rifle'||name==='shotgun';
+  gun.scale.set(1,1,long?1.45:name==='grenade'?.45:1);
+  $('#fire').textContent=name==='physics'?'✥':name==='drop'?'↓':name==='grenade'?'◉':'●';
 }
 function currentRay(){camera.getWorldDirection(tempA);ray.set(camera.position,tempA);return ray}
-function rayTarget(maxDist=65){
-  const r=currentRay();
+function rayTarget(maxDist=65,aimDir=null){
+  const r=currentRay();if(aimDir)r.direction.copy(aimDir);
   let best=null,dist=Infinity;
   for(const d of dummies){
     if(d.enemy&&!d.alive)continue;
@@ -403,6 +412,43 @@ function dropDummy(){
   target.physics=true;target.prev.forEach((p,i)=>p.y+=.08);
   say('VINCOLO SGANCIATO · gravità attiva',1100);
 }
+function shotRay(direction){
+  const base=camera.getWorldDirection(V());
+  const dir=base.clone();
+  dir.addScaledVector(V(1,0,0).applyQuaternion(camera.quaternion),direction.x);
+  dir.addScaledVector(V(0,1,0).applyQuaternion(camera.quaternion),direction.y);
+  return dir.normalize();
+}
+function hitPhysics(d,point,index,dir,damage,force,bleedScale,kind){
+  const prevLife=d.life;
+  addTrauma(d,damage,index,kind);
+  d.bleed=Math.min(9,d.bleed+damage*.018*bleedScale);
+  impulse(d,index,force,dir);
+  bloodBurst(point,dir,Math.min(26,Math.ceil(damage/3)+4));
+  if(d.life<=0&&prevLife>0){
+    say(d.enemy?'BERSAGLIO NEUTRALIZZATO · '+score:'SEGNI VITALI ASSENTI',1250);
+  }else if(!d.enemy){say(zoneOf(index)+' · '+Math.round(d.life)+'% integrità',700)}
+}
+function detonate(position,dir){
+  shake=.10;playSound(56,.4,.19);
+  const size=mesh(sphere,new THREE.MeshBasicMaterial({color:0xffc988,transparent:true,opacity:.48,depthWrite:false}),effects);
+  size.scale.setScalar(.12);size.position.copy(position);
+  decals.push({m:size,life:.5,fade:2});
+  for(let i=0;i<28;i++){
+    const v=V((Math.random()-.5)*2,Math.random()*1.5,(Math.random()-.5)*2).normalize();
+    spark(position,v);
+  }
+  let victims=0;
+  for(const d of dummies){
+    const center=d.points[3],dist=center.distanceTo(position);
+    if(dist<6.5){
+      let falloff=Math.max(.13,1-dist/6.5);
+      hitPhysics(d,center.clone(),3,center.clone().sub(position).normalize(),Math.round(90*falloff),185*falloff,2.2,'ESPLOSIONE');
+      victims++;
+    }
+  }
+  say('ONDA D’URTO · '+victims+' soggetti coinvolti',1700);
+}
 function action(){
   if(!playing)return;
   if(tool==='drop'){dropDummy();return}
@@ -414,28 +460,31 @@ function action(){
     }else say('Mira a un manichino per agganciarlo',1100);
     return;
   }
+  const weapon=weapons[tool]||weapons.pistol;
   const now=performance.now();
-  const rate=tool==='rifle'?125:tool==='pistol'?350:tool==='impact'?470:250;
-  if(now-lastShot<rate)return;lastShot=now;
-  currentRay();
-  const direction=ray.direction.clone();
-  const start=camera.position.clone().addScaledVector(direction,.5);
-  const hit=rayTarget(80);
-  const end=hit?hit.point.clone():camera.position.clone().addScaledVector(direction,65);
-  tracer(start,end,tool);shake=tool==='impact'?.042:tool==='rifle'?.012:.025;
-  playSound(tool==='rifle'?170:tool==='impact'?80:130,tool==='impact'?.18:.07,tool==='impact'?.13:.06);
-  if(hit){
-    const d=hit.d,damage=tool==='impact'?46:tool==='rifle'?17:28;
-    d.life=Math.max(0,d.life-damage);d.hitCount++;
-    impulse(d,hit.i,tool==='impact'?115:tool==='rifle'?35:52,direction);
-    bloodBurst(hit.point,direction,tool==='impact'?19:9);
-    if(d.life<=0&&d.alive){
-      d.alive=false;d.deathAt=now;
-      if(d.enemy)score++;
-      say(d.enemy?'BERSAGLIO NEUTRALIZZATO · '+score:'INTEGRITÀ ESAURITA',1100);
-    }else if(!d.enemy){say('IMPATTO REGISTRATO · integrità '+d.life+'%',700)}
-  } else {spark(end, direction);}
-  updateHud(hit?.d);
+  if(now-lastShot<weapon.cooldown)return;
+  lastShot=now;
+  const baseDir=camera.getWorldDirection(V()),start=camera.position.clone().addScaledVector(baseDir,.5);
+  playSound(weapon.sound,tool==='grenade'?.16:.095,tool==='shotgun'?.11:.068);
+  shake=(tool==='sniper'||tool==='shotgun')?.05:.019;
+  if(tool==='grenade'){
+    const hit=rayTarget(80);
+    const pos=hit?hit.point.clone():camera.position.clone().addScaledVector(baseDir,10);
+    tracer(start,pos,tool);detonate(pos,baseDir);updateHud(hit?.d);return;
+  }
+  let target=null;
+  for(let i=0;i<weapon.pellets;i++){
+    const dir=shotRay({x:(Math.random()-.5)*weapon.spread*2,y:(Math.random()-.5)*weapon.spread*2});
+    const hit=rayTarget(80,dir);
+    const point=hit?hit.point.clone():camera.position.clone().addScaledVector(dir,56);
+    if(i===0||tool==='shotgun'&&i%2===0)tracer(start,point,tool);
+    if(hit){
+      const damage=hit.i===0?weapon.damage*1.55:weapon.damage;
+      hitPhysics(hit.d,hit.point,hit.i,dir,damage,weapon.push,weapon.bleed,'FERITA');
+      target=hit.d;
+    } else if(i===0)spark(point,dir);
+  }
+  updateHud(target);
 }
 function updateHud(aimed){
   const d=aimed||dummies.find(d=>!d.enemy)||dummies.find(d=>d.alive)||dummies[0];
@@ -499,7 +548,7 @@ document.addEventListener('keydown',e=>{
   keys.add(e.code);
   if(e.repeat)return;
   if(e.code==='KeyR'&&playing)reset();
-  const numbers={'Digit1':'pistol','Digit2':'rifle','Digit3':'physics','Digit4':'impact','Digit5':'drop'};
+  const numbers={'Digit1':'pistol','Digit2':'smg','Digit3':'rifle','Digit4':'sniper','Digit5':'shotgun','Digit6':'grenade','Digit7':'physics','Digit8':'drop'};
   if(numbers[e.code])changeTool(numbers[e.code]);
   if(e.code==='Space'&&playing)action();
   if(e.code==='Escape'&&playing)goHome();
@@ -567,7 +616,7 @@ function tick(time){
   const dt=Math.min(.032,Math.max(.001,(time-lastTime)/1000||.016));lastTime=time;
   if(playing){
     movePlayer(dt);
-    if(fireHeld&&tool==='rifle')action();
+    if(fireHeld&&weapons[tool]?.automatic)action();
     currentRay();
     if(held&&held.d){ // Keep grab target at the original distance while looking around
       if(!held.d.alive&&mode==='zombies')held=null;
