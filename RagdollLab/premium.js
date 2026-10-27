@@ -300,6 +300,32 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
   }
   function onImpact(d,pos,damage){createDust(pos,'smoke',Math.min(6,Math.ceil(damage/20)));}
   function setXray(value){xray=Boolean(value)}
+  function resetScene(externalGeometries=[]){
+    const protectedG=new Set([
+      sharedCylinder,round,plane,torsoShape,pelvisShape,organicLimb,organicHead,cheekShape,smallCap,
+      ...externalGeometries
+    ]);
+    const stableMaterials=new Set([...Object.values(materials),...Object.values(palette)]);
+    const encounteredG=new Set(),encounteredM=new Set();
+    for(const group of [world,bodies,effects]){
+      group.traverse(object=>{
+        if(object.geometry && !protectedG.has(object.geometry) && !encounteredG.has(object.geometry)){
+          encounteredG.add(object.geometry);object.geometry.dispose();
+        }
+        for(const mat of Array.isArray(object.material)?object.material:object.material?[object.material]:[]){
+          if(!stableMaterials.has(mat)&&!encounteredM.has(mat)){
+            encounteredM.add(mat);
+            if(mat.map&&!displayTextures.includes(mat.map))mat.map.dispose();
+            mat.dispose();
+          }
+        }
+      });
+      group.clear();
+    }
+    displayScreens.length=0;
+    fans.length=0;
+    casings.length=0;dust.length=0;splats.length=0;
+  }
   function applyQuality(name){
     requestedQuality=name;
     quality=name;
@@ -336,5 +362,5 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
       const s=splats[j];s.age-=dt;if(s.age<0){effects.remove(s.mesh);s.mesh.geometry.dispose();splats.splice(j,1);}
     }
   }
-  return {addArena,enhanceDummy,updateDummy,onShot,onImpact,renderFrame,applyQuality,setXray,get quality(){return quality;}};
+  return {addArena,enhanceDummy,updateDummy,onShot,onImpact,renderFrame,applyQuality,setXray,resetScene,get quality(){return quality;}};
 }
