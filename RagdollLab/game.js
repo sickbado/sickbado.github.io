@@ -1014,7 +1014,7 @@ $('#xrButton').addEventListener('click',()=>{
  }
  say(xrOn?'Organi 3D visibili':'Visualizzazione RX disattivata',1200);
 });
-$$$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
+$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
 $('#grab').addEventListener('click',()=>{
   if(tool!=='physics')changeTool('physics');
   action();
