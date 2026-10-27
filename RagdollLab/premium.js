@@ -332,7 +332,7 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
     quality=name;
     if(name==='alta'){qualityScale=Math.min(1.75,window.devicePixelRatio||1.75);renderer.shadowMap.enabled=true;}
     else if(name==='fluida'){qualityScale=1;renderer.shadowMap.enabled=false;}
-    else {qualityScale=Math.min(window.devicePixelRatio||1.5,lowQuality?1.4:1.65);renderer.shadowMap.enabled=true;}
+    else {qualityScale=Math.min(window.devicePixelRatio||1.5,lowQuality?1.15:1.65);renderer.shadowMap.enabled=true;}
     renderer.setPixelRatio(qualityScale);renderer.setSize(innerWidth,innerHeight);
   }
   function renderFrame(dt,time){
