@@ -292,6 +292,7 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
   function onShot(type,hit,point,dir){
     if(type!=='physics'&&type!=='drop'&&type!=='grenade')ejectCasing(type);
     if(!hit){
+      addBulletMark(point,dir);
       createDust(point,'smoke',3);
     }else{
       createDust(point,'smoke',2);
