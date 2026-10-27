@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="it"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#090f17"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ragdoll Lab"><meta name="description" content="Ragdoll Lab: sandbox 3D per iPhone, costruito con fisica e controlli touch.">
+<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>RAGDOLL LAB | Mobile Physics Sandbox</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--ink:#dce9f8;--aqua:#64e8dc;--red:#ff6966;--glass:rgba(7,16,26,.73)}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07101a;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif;overscroll-behavior:none}
+button{cursor:pointer;font-family:inherit;color:inherit}
+#game{position:fixed;inset:0;touch-action:none;display:block;width:100%;height:100%;background:radial-gradient(circle at 50% 40%,#253843,#071019 78%)}
+#overlay{position:fixed;inset:0;pointer-events:none;display:none}
+#top{position:absolute;top:env(safe-area-inset-top,0px);left:0;right:0;padding:11px 17px 4px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-size:12px;text-shadow:0 1px 5px #000}
+.brand{font-size:13px;font-weight:900;letter-spacing:.22em;color:#bdfefa}.tiny{display:block;font-size:9px;letter-spacing:.16em;color:#a2b3c2;font-weight:650;margin-top:2px}.vitals{border:1px solid rgba(161,230,238,.26);border-radius:9px;background:var(--glass);padding:8px 11px;text-align:right;font-size:11px;min-width:136px;backdrop-filter:blur(6px)}.vitals b{color:var(--aqua)}
+#cross{position:absolute;left:50%;top:49%;transform:translate(-50%,-50%);width:27px;height:27px;opacity:.91}
+#cross:before,#cross:after{content:"";position:absolute;background:rgba(215,255,251,.88);box-shadow:0 0 6px rgba(100,240,229,.5)}
+#cross:before{height:1.5px;width:27px;left:0;top:12.5px}#cross:after{width:1.5px;height:27px;top:0;left:12.5px}
+#cross i{position:absolute;left:9px;top:9px;width:9px;height:9px;border:1px solid #dcfff8;border-radius:50%;box-shadow:0 0 6px #3df7e3}
+#hint{position:absolute;left:50%;transform:translateX(-50%);top:17%;background:rgba(6,15,26,.72);border:1px solid #244254;color:#d6e6ed;border-radius:100px;padding:8px 17px;font-size:11px;text-align:center;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .25s}
+#hint.visible{opacity:1}
+#toolbar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(13px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:6px;padding:6px;border:1px solid rgba(169,202,214,.24);border-radius:16px;background:var(--glass);backdrop-filter:blur(14px);pointer-events:auto;max-width:93vw;overflow-x:auto;scrollbar-width:none}
+#toolbar::-webkit-scrollbar{display:none}
+.tool{border:1px solid rgba(221,245,255,.16);border-radius:10px;background:#1a2835;min-width:58px;height:46px;font-size:10px;font-weight:750;white-space:nowrap;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:3px 8px}
+.tool span{font-size:17px;line-height:1}.tool.active{color:#001d21;background:#70e9dc;border-color:#b9fff8;box-shadow:0 0 12px rgba(80,224,213,.22)}
+#stick{position:absolute;left:calc(18px + env(safe-area-inset-left,0px));bottom:calc(87px + env(safe-area-inset-bottom,0px));width:115px;height:115px;border-radius:50%;border:2px solid rgba(171,229,237,.3);background:rgba(15,33,43,.28);backdrop-filter:blur(2px);pointer-events:auto;touch-action:none}
+#stick:after{content:"";position:absolute;inset:21px;border:1px solid rgba(199,255,253,.16);border-radius:50%}
+#knob{position:absolute;left:36px;top:36px;width:41px;height:41px;border-radius:50%;border:2px solid rgba(222,255,254,.73);background:radial-gradient(circle,#78e6e0,#1c6875);box-shadow:0 0 15px #102f35;pointer-events:none}
+#actionArea{position:absolute;right:calc(17px + env(safe-area-inset-right,0px));bottom:calc(88px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;align-items:flex-end;pointer-events:auto}
+.action{background:rgba(9,25,37,.79);border:2px solid rgba(220,245,247,.5);border-radius:50%;width:58px;height:58px;font-weight:850;font-size:11px;touch-action:none;user-select:none}
+#fire{height:87px;width:87px;border-color:#ff8581;background:radial-gradient(circle at 40% 35%,rgba(211,80,83,.88),rgba(111,27,43,.94));box-shadow:0 0 22px rgba(246,63,86,.24);font-size:17px}
+#grab{border-color:#69e3da;font-size:10px}
+#upperBtns{position:absolute;top:calc(84px + env(safe-area-inset-top,0px));right:15px;display:flex;gap:7px;pointer-events:auto}
+.smallBtn{border-radius:8px;padding:8px 10px;border:1px solid rgba(130,195,208,.38);background:var(--glass);font-size:10px;font-weight:850;letter-spacing:.06em}
+#health{position:absolute;left:16px;top:calc(62px + env(safe-area-inset-top,0px));font-size:11px;letter-spacing:.08em;color:#cae0e8}
+#healthbar{margin-top:5px;width:128px;height:6px;background:#172832;border-radius:6px;overflow:hidden;border:1px solid #405260}
+#healthbar>div{width:100%;height:100%;background:linear-gradient(90deg,#fa645f,#ffb2a3);transition:width .12s}
+#mode{font-weight:800;color:#7de4d6}
+#desktopHint{position:absolute;left:50%;bottom:85px;transform:translateX(-50%);font-size:11px;opacity:.6;white-space:nowrap}
+#home{position:fixed;inset:0;z-index:4;display:flex;align-items:center;justify-content:center;background:linear-gradient(100deg,rgba(4,12,20,.97),rgba(7,17,27,.86)),radial-gradient(circle at 80% 30%,#3b7885,transparent 40%);padding:24px;overflow-y:auto}
+.homeCard{max-width:490px;width:100%;position:relative}
+.code{color:#7ff7e5;letter-spacing:.32em;font-size:11px;font-weight:900}
+h1{font-size:clamp(34px,7vw,62px);letter-spacing:-.07em;line-height:1.02;margin:14px 0 13px;font-weight:1000;color:#f5fbff}
+h1 em{color:#71eee1;font-style:normal}
+.homeCard p{font-size:14px;line-height:1.55;color:#aabfc9;max-width:400px}
+.selecttitle{font-size:11px;letter-spacing:.16em;margin-top:22px;color:#7c99a8;font-weight:900}
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:10px 0 18px}
+.modebtn{border:1px solid #2d4555;background:linear-gradient(160deg,#18303b,#101b28);border-radius:12px;padding:13px 8px;text-align:left;min-height:104px}
+.modebtn.active{border-color:#7af0e4;background:linear-gradient(150deg,#244957,#102e36);box-shadow:0 0 15px #1a5d5933}
+.modebtn strong{font-size:12px;display:block;color:#f1f8fb}.modebtn small{display:block;font-size:10px;color:#9fb8c2;margin-top:7px;line-height:1.35}
+.modebtn .emoji{font-size:24px;display:block;margin-bottom:8px}
+#launch{background:#87f3e4;color:#042a32;width:100%;padding:17px;border:0;border-radius:11px;font-size:13px;font-weight:1000;letter-spacing:.2em;box-shadow:0 10px 30px #33dec022}
+.legal{font-size:10px!important;color:#788f9a!important;margin-top:14px!important}
+#rotate{position:fixed;z-index:3;inset:0;background:#09131e;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;font-size:16px;font-weight:800}
+#rotate strong{font-size:35px;display:block;margin-bottom:17px}
+#fatal{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;padding:25px;background:#09121b;color:#fff;text-align:center;line-height:1.6}
+@media(max-width:700px) and (orientation:portrait){#rotate:not(.off){display:flex}}
+@media(max-height:430px){#top{padding:5px 13px}.vitals{padding:4px 7px}#upperBtns{top:56px}#health{top:44px}#stick{width:102px;height:102px;bottom:59px}#knob{left:30px;top:30px}#actionArea{bottom:59px}#toolbar{bottom:6px;transform:translateX(-50%) scale(.82)}#desktopHint{display:none}}
+@media(pointer:fine){#stick,#actionArea{opacity:.8}#desktopHint{display:block}}
+</style></head><body>
+<canvas id="game"></canvas>
+<div id="overlay">
+  <div id="top"><div><div class="brand">RAGDOLL LAB <span style="color:#6c8493;font-weight:600">/ MOBILE</span></div><span class="tiny">RESEARCH FACILITY · PROTOTIPO 0.1</span></div><div class="vitals">BERSAGLIO <b id="targetHealth">100%</b><br><span id="targetState">INTEGRITÀ STRUTTURALE</span></div></div>
+  <div id="health">OPERATORE <span id="mode">SANDBOX</span><div id="healthbar"><div id="healthFill"></div></div></div>
+  <div id="upperBtns"><button class="smallBtn" id="reset">↻ RIPRISTINA</button><button class="smallBtn" id="menu">☰ MENU</button></div>
+  <div id="hint" role="status"></div><div id="cross"><i></i></div>
+  <div id="stick"><div id="knob"></div></div>
+  <div id="actionArea"><button id="grab" class="action">AGGANCIA</button><button id="fire" class="action">●</button></div>
+  <div id="toolbar">
+    <button class="tool active" data-tool="pistol"><span>⌖</span>PISTOLA</button>
+    <button class="tool" data-tool="rifle"><span>↠</span>FUCILE</button>
+    <button class="tool" data-tool="physics"><span>◇</span>FISICA</button>
+    <button class="tool" data-tool="impact"><span>✺</span>IMPULSO</button>
+    <button class="tool" data-tool="drop"><span>↓</span>CADUTA</button>
+  </div>
+  <div id="desktopHint">WASD muovi · Trascina per guardare · Clic per agire · 1–5 strumenti · R ripristina</div>
+</div>
+<div id="home"><div class="homeCard">
+  <div class="code">UNITÀ DI SIMULAZIONE / RL-01</div>
+  <h1>RAGDOLL<br><em>LAB.</em></h1>
+  <p>Il nostro laboratorio 3D sperimentale. Prova reazioni fisiche, lancia manichini, sperimenta con gli strumenti e sopravvivi alle ondate. Costruito per iPhone, senza streaming e senza computer acceso.</p>
+  <div class="selecttitle">SELEZIONA AMBIENTE</div>
+  <div class="modes">
+    <button class="modebtn active" data-mode="lab"><span class="emoji">🧪</span><strong>IL LABORATORIO</strong><small>Sandbox · manichini e attrezzature</small></button>
+    <button class="modebtn" data-mode="tower"><span class="emoji">🏗️</span><strong>TORRE 16 M</strong><small>Cadute · gravità e impatti</small></button>
+    <button class="modebtn" data-mode="zombies"><span class="emoji">⚠️</span><strong>ONDATE</strong><small>Survival · bersagli in movimento</small></button>
+  </div>
+  <button id="launch">ENTRA NEL LABORATORIO →</button>
+  <p class="legal">Progetto indipendente originale, ispirato al genere ragdoll sandbox. Non è Project C.A.R.L. né una sua conversione ufficiale. Ruota l'iPhone in orizzontale per giocare meglio.</p>
+</div></div>
+<div id="rotate"><div><strong>↻</strong>RUOTA L'IPHONE IN ORIZZONTALE<br><small style="color:#86a0ac;font-weight:400">Per visualizzare il laboratorio e i comandi di gioco.</small></div></div>
+<div id="fatal"></div>
+<script type="module" src="game.js"></script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}</script>
+</body></html>
