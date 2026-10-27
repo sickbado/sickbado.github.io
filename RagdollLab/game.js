@@ -719,7 +719,7 @@ function setAim(state){
  aim.textContent=aimToggle?'MIRA ✓':'MIRA';
 }
 function changeTool(name){
-  tool=name;held=null;
+  tool=name;held=null;lastShot=-100000;
   if(reloading)reloading='';setAim(false);
   $('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   const info={physics:'Physics gun · aggancia o lascia il bersaglio',drop:'Caduta · libera il manichino'};
@@ -944,7 +944,7 @@ function startGame(newMode){
   mode=newMode;playing=true;home.style.display='none';overlay.style.display='block';
   premium.applyQuality(qualityChoice);
   for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
-  reloading='';setAim(false);refreshAmmo();
+  reloading='';lastShot=-100000;setAim(false);refreshAmmo();
   $('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');
   if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 }
