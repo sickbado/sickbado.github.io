@@ -47,6 +47,11 @@ const materials={
   enemy:new THREE.MeshStandardMaterial({color:0x918f84,roughness:.74}),
   enemyJoint:new THREE.MeshStandardMaterial({color:0x713f3f,roughness:.7}),
   visor:new THREE.MeshStandardMaterial({color:0x19383d,emissive:0x31ccc2,emissiveIntensity:.65,metalness:.6}),
+  brain:new THREE.MeshStandardMaterial({color:0xe4baaa,roughness:.75}),
+  lung:new THREE.MeshStandardMaterial({color:0xad4555,roughness:.73}),
+  heart:new THREE.MeshStandardMaterial({color:0x8f263e,roughness:.66}),
+  liver:new THREE.MeshStandardMaterial({color:0x673246,roughness:.73}),
+  bone:new THREE.MeshStandardMaterial({color:0xe0d5b0,roughness:.7}),
   evil:new THREE.MeshStandardMaterial({color:0x8b1818,emissive:0xf52323,emissiveIntensity:1.2})
 };
 const cube=new THREE.BoxGeometry(1,1,1), sphere=new THREE.SphereGeometry(1,12,9);
@@ -178,6 +183,30 @@ function makeDummy(x,z,y=0,isEnemy=false){
   }
   d.visor=mesh(sphere,isEnemy?materials.evil:materials.visor,bodies);
   d.visor.scale.set(.19,.068,.035);
+  d.torso=mesh(sphere,isEnemy?materials.enemy:materials.dummy,bodies);
+  d.torso.scale.set(.31,.37,.20);
+  d.pelvis=mesh(sphere,isEnemy?materials.enemy:materials.dummy,bodies);
+  d.pelvis.scale.set(.29,.20,.18);
+  d.face= new THREE.Group();bodies.add(d.face);
+  d.eyes=[];
+  for(const side of [-1,1]){
+    const eye=mesh(sphere,isEnemy?materials.evil:materials.dummyJoint,d.face);
+    eye.position.set(side*.088,.036,.203);eye.scale.set(.029,.025,.021);d.eyes.push(eye);
+  }
+  const nose=mesh(new THREE.ConeGeometry(.048,.15,7),isEnemy?materials.enemy:materials.dummy,d.face);
+  nose.position.set(0,-.028,.224);nose.rotation.x=Math.PI*.5;
+  const anatomy=[];
+  for(const [organ,pos,scale,mat] of [
+    ['brain',V(0,1.86,0),[.14,.13,.14],materials.brain],
+    ['lungsL',V(-.118,1.40,0),[.12,.19,.13],materials.lung],
+    ['lungsR',V(.118,1.40,0),[.12,.19,.13],materials.lung],
+    ['heart',V(0,1.38,.06),[.10,.12,.10],materials.heart],
+    ['liver',V(.09,1.13,.01),[.18,.10,.13],materials.liver]
+  ]){
+    const m=mesh(sphere,mat,bodies);m.scale.set(...scale);
+    m.visible=xrOn;anatomy.push({organ,m,offset:pos});
+  }
+  d.anatomy=anatomy;
   dummies.push(d);pose(d);return d;
 }
 function pose(d){
@@ -190,6 +219,18 @@ function pose(d){
   }
   d.head.position.copy(pts[0]);
   d.visor.position.copy(pts[0]).add(V(0,-.016,.224));
+  d.torso.position.copy(pts[1]).lerp(pts[3],.49);
+  d.pelvis.position.copy(pts[3]);
+  const headAxis=tempA.subVectors(pts[0],pts[1]).normalize();
+  d.face.position.copy(pts[0]);
+  d.face.quaternion.setFromUnitVectors(up,headAxis);
+  for(const {organ,m,offset} of d.anatomy){
+    const root=organ==='brain'?pts[0]:pts[3];
+    if(organ==='brain')m.position.copy(root);
+    else m.position.copy(root).addScaledVector(tempB.subVectors(pts[1],pts[3]),(offset.y-.97)/(.6));
+    if(organ!=='brain')m.position.add(V(offset.x,0,offset.z));
+    m.visible=xrOn;
+  }
   for(const [i,s] of d.joints)s.position.copy(pts[i]);
 }
 function floorAt(x,z){return mode==='tower' && Math.abs(x)<2.7 && z> -4.98 && z< -1.5?16.14:0}
@@ -526,7 +567,7 @@ $('#launch').addEventListener('click',()=>startGame($('.modebtn.active').dataset
 $('#reset').addEventListener('click',reset);$('#menu').addEventListener('click',goHome);
 $('#medButton').addEventListener('click',()=>{medOpen=!medOpen;$('#medical').classList.toggle('open',medOpen);updateHud(rayTarget(75)?.d);});
 $('#medClose').addEventListener('click',()=>{medOpen=false;$('#medical').classList.remove('open')});
-$('#xrButton').addEventListener('click',()=>{xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';say(xrOn?'Visualizzazione RX attiva':'Visualizzazione RX disattivata',1200);});
+$('#xrButton').addEventListener('click',()=>{xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';for(const m of [materials.dummy,materials.enemy]){m.transparent=xrOn;m.opacity=xrOn?.24:1;m.needsUpdate=true;}say(xrOn?'Organi 3D visibili':'Visualizzazione RX disattivata',1200);});
 $$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
 $('#grab').addEventListener('click',()=>{
   if(tool!=='physics')changeTool('physics');
