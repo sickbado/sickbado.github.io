@@ -178,6 +178,28 @@ h1 em{color:#71eee1;font-style:normal}
 </div></div>
 <div id="rotate" class="off"><div><strong>↻</strong>RUOTA L'IPHONE IN ORIZZONTALE<br><small style="color:#86a0ac;font-weight:400">Per visualizzare il laboratorio e i comandi di gioco.</small></div></div>
 <div id="fatal"></div>
+<script>
+window.__ragdollErrors=[];
+window.__ragdollReport=function(error){
+ const message=error && (error.stack||error.message||String(error)) || 'Errore sconosciuto';
+ window.__ragdollErrors.push(message);
+ const el=document.getElementById('fatal');
+ if(el){
+  el.style.display='flex';
+  el.style.zIndex='1000';
+  el.innerHTML='';
+  const item=document.createElement('div');
+  item.style.cssText='background:#102430;border:1px solid #d58b82;padding:18px;border-radius:12px;width:min(90vw,620px);overflow:auto';
+  const heading=document.createElement('strong');heading.textContent='Problema nel motore 3D';item.append(heading);
+  const p=document.createElement('p');p.style.cssText='font-size:12px;overflow-wrap:anywhere;white-space:pre-wrap';
+  p.textContent=message.slice(0,700);item.append(p);
+  const button=document.createElement('button');button.textContent='Chiudi';button.style.cssText='padding:10px;border:1px solid #74d2ca;background:#14343e;border-radius:7px';button.onclick=()=>{el.style.display='none'};item.append(button);
+  el.append(item);
+ }
+};
+window.addEventListener('error',e=>{if(e.error)window.__ragdollReport(e.error);});
+window.addEventListener('unhandledrejection',e=>window.__ragdollReport(e.reason));
+</script>
 <script type="module" src="game.js?edition=1_0_final"></script>
 <script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}</script>
 </body></html>
