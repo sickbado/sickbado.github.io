@@ -1,9 +1,9 @@
 /* Ragdoll Lab production cache; first run needs Internet, thereafter the engine
  * and our own core assets are eligible for offline use from the installed PWA.
  */
-const CACHE='ragdoll-lab-production-1-final';
+const CACHE='ragdoll-lab-production-1-canvasfix';
 const ENGINE='https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
-const SHELL=['./','./index.html','./game.js?edition=1_0_final','./premium.js?edition=1_0_final','./manifest.webmanifest','./icon.svg'];
+const SHELL=['./','./index.html','./game.js?edition=1_0_canvasfix','./premium.js?edition=1_0_canvasfix','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',event=>{
  event.waitUntil(caches.open(CACHE).then(async cache=>{
    await cache.addAll(SHELL);
