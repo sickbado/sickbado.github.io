@@ -152,6 +152,7 @@ const bones=[
 ];
 const braces=[[1,4],[1,7],[4,3],[7,3],[4,10],[7,13],[10,13],[5,2],[8,2]];
 let dummies=[],particles=[],decals=[],mode='lab',tool='pistol',playing=false,held=null;
+let medOpen=false,xrOn=false;
 let health=100,wave=0,score=0,nextWaveAt=0,shake=0,lastShot=0,lastTime=0;
 const tempA=V(),tempB=V(),tmp=V(),ray=new THREE.Ray(),up=V(0,1,0);
 function makeDummy(x,z,y=0,isEnemy=false){
@@ -489,9 +490,24 @@ function action(){
 function updateHud(aimed){
   const d=aimed||dummies.find(d=>!d.enemy)||dummies.find(d=>d.alive)||dummies[0];
   $('#targetHealth').textContent=d?Math.round(d.life)+'%':'—';
-  $('#targetState').textContent=d?(d.life<=0?'SISTEMA NON OPERATIVO':d.physics?'FISICA ATTIVA':'BERSAGLIO STABILE'):'NESSUN BERSAGLIO';
+  $('#targetState').textContent=d?(d.life<=0?'SISTEMA NON OPERATIVO':d.blood<40?'EMORRAGIA CRITICA':d.physics?'FISICA ATTIVA':'BERSAGLIO STABILE'):'NESSUN BERSAGLIO';
   hudHealth.style.width=health+'%';
   $('#mode').textContent=mode==='zombies'?'ONDATA '+wave+' / '+score:mode==='tower'?'TEST VERTICALE':'SANDBOX';
+  if(!d)return;
+  $('#medState').textContent=d.life<=0?'PRIVO DI VITALITÀ':d.life<35?'CRITICO':d.bleed>2?'EMORRAGIA':'STABILE';
+  $('#medBlood').textContent=d.blood.toFixed(1)+'%';
+  $('#bloodMeter').style.width=d.blood+'%';
+  $('#medBrain').textContent=Math.round(d.organs.brain)+'%';
+  $('#medHeart').textContent=Math.round(d.organs.heart)+'%';
+  $('#medLungs').textContent=Math.round(d.organs.lungs)+'%';
+  $('#medLiver').textContent=Math.round(d.organs.liver)+'%';
+  $('#medBleed').textContent=(d.bleed*.7).toFixed(1)+'%/s';
+  $('#injuries').textContent=d.injuries.length?d.injuries.join('\n'):'Nessuna lesione rilevata.';
+  $('#injuries').style.whiteSpace='pre-line';
+  for(const [id,score] of [['xBrain',d.organs.brain],['xHeart',d.organs.heart],['xLungs',d.organs.lungs],['xLiver',d.organs.liver]]){
+    const element=$('#'+id);
+    if(element)element.classList.toggle('dim',score<35);
+  }
 }
 let hintTimer=0;
 function say(t,ms=1800){const el=$('#hint');el.textContent=t;el.classList.add('visible');clearTimeout(hintTimer);hintTimer=setTimeout(()=>el.classList.remove('visible'),ms)}
@@ -500,7 +516,7 @@ function startGame(newMode){
   $('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');
   if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 }
-function reset(){held=null;buildArena(mode);spawnForMode();changeTool('pistol')}
+function reset(){held=null;buildArena(mode);spawnForMode();changeTool('pistol');updateHud()}
 function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';$('#rotate').classList.add('off');fireHeld=false;
   if(document.pointerLockElement)document.exitPointerLock();}
 $$('.modebtn').forEach(btn=>btn.addEventListener('click',()=>{
@@ -508,6 +524,9 @@ $$('.modebtn').forEach(btn=>btn.addEventListener('click',()=>{
 }));
 $('#launch').addEventListener('click',()=>startGame($('.modebtn.active').dataset.mode));
 $('#reset').addEventListener('click',reset);$('#menu').addEventListener('click',goHome);
+$('#medButton').addEventListener('click',()=>{medOpen=!medOpen;$('#medical').classList.toggle('open',medOpen);updateHud(rayTarget(75)?.d);});
+$('#medClose').addEventListener('click',()=>{medOpen=false;$('#medical').classList.remove('open')});
+$('#xrButton').addEventListener('click',()=>{xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';say(xrOn?'Visualizzazione RX attiva':'Visualizzazione RX disattivata',1200);});
 $$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
 $('#grab').addEventListener('click',()=>{
   if(tool!=='physics')changeTool('physics');
