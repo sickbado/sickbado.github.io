@@ -723,7 +723,7 @@ function setAim(state){
 function changeTool(name){
   tool=name;held=null;lastShot=-100000;
   if(reloading)reloading='';setAim(false);
-  $('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
+  $$('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   const info={physics:'Physics gun · aggancia o lascia il bersaglio',drop:'Caduta · libera il manichino'};
   say(weapons[name]?.label||info[name]||'',1850);
   makeGun(name);
@@ -999,10 +999,10 @@ $('#reloadHUD').addEventListener('click',reloadWeapon);
 $('#aim').addEventListener('click',()=>setAim(!aimToggle));
 function chooseQuality(name){
  qualityChoice=name;premium.applyQuality(name);
- $('.qualityOption').forEach(b=>b.classList.toggle('active',b.dataset.quality===name));
+ $$('.qualityOption').forEach(b=>b.classList.toggle('active',b.dataset.quality===name));
  $('#qualityBtn').textContent='◈ '+({auto:'AUTO',alta:'ALTA',fluida:'FPS'}[name]||'AUTO');
 }
-$('.qualityOption').forEach(b=>b.addEventListener('click',()=>chooseQuality(b.dataset.quality)));
+$$('.qualityOption').forEach(b=>b.addEventListener('click',()=>chooseQuality(b.dataset.quality)));
 $('#qualityBtn').addEventListener('click',()=>chooseQuality(qualityChoice==='auto'?'alta':qualityChoice==='alta'?'fluida':'auto'));
 chooseQuality('auto');
 $('#medButton').addEventListener('click',()=>{medOpen=!medOpen;$('#medical').classList.toggle('open',medOpen);updateHud(rayTarget(75)?.d);});
@@ -1014,7 +1014,7 @@ $('#xrButton').addEventListener('click',()=>{
  }
  say(xrOn?'Organi 3D visibili':'Visualizzazione RX disattivata',1200);
 });
-$$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
+$$$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
 $('#grab').addEventListener('click',()=>{
   if(tool!=='physics')changeTool('physics');
   action();
