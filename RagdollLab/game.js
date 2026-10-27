@@ -613,8 +613,9 @@ function translateDummy(d,dx,dz){
 const player={x:0,y:1.65,z:7};
 let yaw=0,pitch=0,joyX=0,joyY=0,keys=new Set(),aimPointer=null,lookX=0,lookY=0,fireHeld=false;
 let heldAudio=null;
-let recoil=0,muzzleAge=0,muzzleFlash=null,muzzleLight=null;
+let recoil=0,muzzleAge=0,muzzleFlash=null,muzzleLight=null,aimToggle=false,aimBlend=0,aimDown=false;
 function makeGun(kind='pistol'){
+  gun.traverse(o=>{if(o.isMesh && o.geometry && o.geometry!==cube && o.geometry!==sphere && o.geometry!==cylinder){o.geometry.dispose();}});
   gun.clear(); gun.position.set(0,0,0);gun.rotation.set(0,0,0);gun.scale.setScalar(1);
   const long=['smg','rifle','sniper','shotgun','physics'].includes(kind);
   const grip=long?.32:.22;
@@ -685,13 +686,41 @@ const weapons={
  shotgun:{label:'Fucile a pompa · rosata ravvicinata',cooldown:740,damage:14,push:37,spread:.115,pellets:8,automatic:false,sound:84,bleed:1.5},
  grenade:{label:'Granata · esplosione localizzata',cooldown:1300,damage:90,push:158,spread:0,pellets:1,automatic:false,sound:48,bleed:2}
 };
+const magazineSize={pistol:15,smg:30,rifle:30,sniper:5,shotgun:6,grenade:4};
+const ammo={...magazineSize};
+const reloadDuration={pistol:1200,smg:1600,rifle:1650,sniper:1900,shotgun:1850,grenade:1100};
+let reloading='',reloadEnds=0,qualityChoice='auto';
+function refreshAmmo(){
+ const field=$('#ammoHUD'),n=$('#ammoNumber'),kind=$('#ammoName'),button=$('#reloadHUD');
+ if(!field)return;
+ if(!(tool in magazineSize)){n.textContent='∞';kind.textContent=tool==='physics'?'GRAVITÀ':'TEST';button.style.display='none';return}
+ button.style.display='inline-block';n.textContent=reloading===tool?'••':String(ammo[tool]);
+ kind.textContent=reloading===tool?'RICARICA…':String(magazineSize[tool])+' COLPI';
+ n.style.color=ammo[tool]<=3?'#ffae94':'#edf9f4';
+ button.disabled=Boolean(reloading);
+ button.style.opacity=reloading?'.5':'1';
+}
+function reloadWeapon(){
+ if(!playing||!magazineSize[tool]||reloading||ammo[tool]===magazineSize[tool])return;
+ reloading=tool;reloadEnds=performance.now()+reloadDuration[tool];
+ fireHeld=false;playSound(650,.13,.04);say('RICARICA IN CORSO',650);
+ refreshAmmo();
+}
+function setAim(state){
+ aimToggle=Boolean(state);
+ const aim=$('#aim');
+ aim.classList.toggle('active',aimToggle);
+ aim.textContent=aimToggle?'MIRA ✓':'MIRA';
+}
 function changeTool(name){
   tool=name;held=null;
-  $$('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
+  if(reloading)reloading='';setAim(false);
+  $('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   const info={physics:'Physics gun · aggancia o lascia il bersaglio',drop:'Caduta · libera il manichino'};
   say(weapons[name]?.label||info[name]||'',1850);
   makeGun(name);
   $('#fire').textContent=name==='physics'?'✥':name==='drop'?'↓':name==='grenade'?'◉':'●';
+  refreshAmmo();
 }
 function currentRay(){camera.getWorldDirection(tempA);ray.set(camera.position,tempA);return ray}
 function rayTarget(maxDist=65,aimDir=null){
@@ -822,8 +851,11 @@ function action(){
   }
   const weapon=weapons[tool]||weapons.pistol;
   const now=performance.now();
-  if(now-lastShot<weapon.cooldown)return;
+  if(reloading||now-lastShot<weapon.cooldown)return;
+  if(ammo[tool]===0){reloadWeapon();return;}
+  ammo[tool]=Math.max(0,ammo[tool]-1);
   lastShot=now;
+  refreshAmmo();
   recoil=Math.min(.18,recoil+(tool==='sniper'?.14:tool==='shotgun'?.12:tool==='rifle'?.045:.055));
   muzzleAge=.065;if(muzzleFlash)muzzleFlash.visible=tool!=='grenade';
   if(muzzleLight)muzzleLight.intensity=tool==='grenade'?0:7;
@@ -837,7 +869,8 @@ function action(){
   }
   let target=null;
   for(let i=0;i<weapon.pellets;i++){
-    const dir=shotRay({x:(Math.random()-.5)*weapon.spread*2,y:(Math.random()-.5)*weapon.spread*2});
+    const spread=weapon.spread*(aimBlend>.65?.55:1);
+    const dir=shotRay({x:(Math.random()-.5)*spread*2,y:(Math.random()-.5)*spread*2});
     const hit=rayTarget(80,dir);
     const point=hit?hit.point.clone():camera.position.clone().addScaledVector(dir,56);
     if(i===0||tool==='shotgun'&&i%2===0)tracer(start,point,tool);
@@ -876,20 +909,39 @@ let hintTimer=0;
 function say(t,ms=1800){const el=$('#hint');el.textContent=t;el.classList.add('visible');clearTimeout(hintTimer);hintTimer=setTimeout(()=>el.classList.remove('visible'),ms)}
 function startGame(newMode){
   mode=newMode;playing=true;home.style.display='none';overlay.style.display='block';
+  premium.applyQuality(qualityChoice);
+  for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
+  reloading='';setAim(false);refreshAmmo();
   $('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');
   if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 }
-function reset(){held=null;buildArena(mode);spawnForMode();changeTool('pistol');updateHud()}
-function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';$('#rotate').classList.add('off');fireHeld=false;
+function reset(){held=null;reloading='';for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;buildArena(mode);spawnForMode();changeTool('pistol');updateHud()}
+function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';$('#rotate').classList.add('off');fireHeld=false;setAim(false);
   if(document.pointerLockElement)document.exitPointerLock();}
 $$('.modebtn').forEach(btn=>btn.addEventListener('click',()=>{
   $$('.modebtn').forEach(b=>b.classList.toggle('active',b===btn));
 }));
 $('#launch').addEventListener('click',()=>startGame($('.modebtn.active').dataset.mode));
 $('#reset').addEventListener('click',reset);$('#menu').addEventListener('click',goHome);
+$('#reloadHUD').addEventListener('click',reloadWeapon);
+$('#aim').addEventListener('click',()=>setAim(!aimToggle));
+function chooseQuality(name){
+ qualityChoice=name;premium.applyQuality(name);
+ $('.qualityOption').forEach(b=>b.classList.toggle('active',b.dataset.quality===name));
+ $('#qualityBtn').textContent='◈ '+({auto:'AUTO',alta:'ALTA',fluida:'FPS'}[name]||'AUTO');
+}
+$('.qualityOption').forEach(b=>b.addEventListener('click',()=>chooseQuality(b.dataset.quality)));
+$('#qualityBtn').addEventListener('click',()=>chooseQuality(qualityChoice==='auto'?'alta':qualityChoice==='alta'?'fluida':'auto'));
+chooseQuality('auto');
 $('#medButton').addEventListener('click',()=>{medOpen=!medOpen;$('#medical').classList.toggle('open',medOpen);updateHud(rayTarget(75)?.d);});
 $('#medClose').addEventListener('click',()=>{medOpen=false;$('#medical').classList.remove('open')});
-$('#xrButton').addEventListener('click',()=>{xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';for(const m of [materials.dummy,materials.enemy]){m.transparent=xrOn;m.opacity=xrOn?.24:1;m.needsUpdate=true;}say(xrOn?'Organi 3D visibili':'Visualizzazione RX disattivata',1200);});
+$('#xrButton').addEventListener('click',()=>{
+ xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';
+ for(const m of [materials.dummy,materials.enemy,materials.skin,materials.skin2,materials.deadSkin,materials.coverall,materials.fabric,materials.trousers,materials.hair,materials.enemyJoint]){
+  m.transparent=xrOn;m.opacity=xrOn?.18:1;m.depthWrite=!xrOn;m.needsUpdate=true;
+ }
+ say(xrOn?'Organi 3D visibili':'Visualizzazione RX disattivata',1200);
+});
 $$('.tool').forEach(btn=>btn.addEventListener('click',()=>changeTool(btn.dataset.tool)));
 $('#grab').addEventListener('click',()=>{
   if(tool!=='physics')changeTool('physics');
@@ -930,23 +982,28 @@ document.addEventListener('keydown',e=>{
   keys.add(e.code);
   if(e.repeat)return;
   if(e.code==='KeyR'&&playing)reset();
+  if(e.code==='KeyF'&&playing)reloadWeapon();
+  if(e.code==='ShiftLeft')aimDown=true;
   const numbers={'Digit1':'pistol','Digit2':'smg','Digit3':'rifle','Digit4':'sniper','Digit5':'shotgun','Digit6':'grenade','Digit7':'physics','Digit8':'drop'};
   if(numbers[e.code])changeTool(numbers[e.code]);
   if(e.code==='Space'&&playing)action();
   if(e.code==='Escape'&&playing)goHome();
 });
-document.addEventListener('keyup',e=>keys.delete(e.code));
+document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='ShiftLeft')aimDown=false;});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.45));
-  renderer.setSize(innerWidth,innerHeight);
+  premium.applyQuality(qualityChoice);
 });
 function movePlayer(dt){
   const forward=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0)-joyY;
   const right=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0)+joyX;
   const mag=Math.max(1,Math.hypot(forward,right));
-  const speed=mode==='tower'?4:5.7,step=speed*dt/mag;
+  const aiming=aimToggle||aimDown;
+  aimBlend=THREE.MathUtils.damp(aimBlend,aiming?1:0,11,dt);
+  const targetFov=aiming?(tool==='sniper'?34:56):75;
+  if(Math.abs(camera.fov-targetFov)>.03){camera.fov=THREE.MathUtils.damp(camera.fov,targetFov,11,dt);camera.updateProjectionMatrix();}
+  const speed=mode==='tower'?4:5.7,step=speed*(aiming?.75:1)*dt/mag;
   player.x+=(-Math.sin(yaw)*forward+Math.cos(yaw)*right)*step;
   player.z+=(-Math.cos(yaw)*forward-Math.sin(yaw)*right)*step;
   player.x=THREE.MathUtils.clamp(player.x,-13,13);
@@ -956,8 +1013,9 @@ function movePlayer(dt){
   if(shake>0){camera.rotation.z=(Math.random()-.5)*shake;shake*=.78;if(shake<.0008)shake=0;}
   else camera.rotation.z=0;
   recoil*=.82;
-  gun.position.z=recoil*.85;
-  gun.position.y=-recoil*.35;
+  gun.position.z=recoil*.85-aimBlend*.19;
+  gun.position.y=-recoil*.35+aimBlend*.13;
+  gun.position.x=-aimBlend*.25;
   gun.rotation.x=-recoil*.9+Math.sin(performance.now()*.0021)*.005;
   gun.rotation.z=Math.sin(performance.now()*.003)*.014;
 }
@@ -1002,6 +1060,7 @@ function tick(time){
   requestAnimationFrame(tick);
   const dt=Math.min(.032,Math.max(.001,(time-lastTime)/1000||.016));lastTime=time;
   if(playing){
+    if(reloading && time>=reloadEnds){ammo[reloading]=magazineSize[reloading];reloading='';playSound(920,.08,.035);refreshAmmo();}
     if(muzzleAge>0){muzzleAge-=dt;if(muzzleAge<=0){if(muzzleFlash)muzzleFlash.visible=false;if(muzzleLight)muzzleLight.intensity=0;}}
     movePlayer(dt);
     if(fireHeld&&weapons[tool]?.automatic)action();
