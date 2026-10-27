@@ -1112,7 +1112,8 @@ function updateEffects(dt){
 }
 function tick(time){
   requestAnimationFrame(tick);
-  const dt=Math.min(.032,Math.max(.001,(time-lastTime)/1000||.016));lastTime=time;
+  const rawDt=Math.max(.001,(time-lastTime)/1000||.016);
+  const dt=Math.min(.032,rawDt);lastTime=time;
   if(playing){
     if(reloading && time>=reloadEnds){ammo[reloading]=magazineSize[reloading];reloading='';playSound(920,.08,.035);refreshAmmo();}
     if(muzzleAge>0){muzzleAge-=dt;if(muzzleAge<=0){if(muzzleFlash)muzzleFlash.visible=false;if(muzzleLight)muzzleLight.intensity=0;}}
@@ -1127,7 +1128,7 @@ function tick(time){
       animateLiving(d,time);simulate(d,dt);medicalTick(d,dt);pose(d);
     }
     updateEffects(dt);
-    premium.renderFrame(dt,time);
+    premium.renderFrame(Math.min(.12,rawDt),time);
     if((Math.floor(time/150)%4)===0){
       const target=rayTarget(75);
       if(target&&target.d)updateHud(target.d);
