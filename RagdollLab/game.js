@@ -981,8 +981,19 @@ $('#grab').addEventListener('click',()=>{
   action();
 });
 const fireButton=$('#fire');
-fireButton.addEventListener('pointerdown',e=>{e.preventDefault();fireHeld=true;action();fireButton.setPointerCapture(e.pointerId)});
-for(const event of ['pointerup','pointercancel','lostpointercapture'])fireButton.addEventListener(event,()=>fireHeld=false);
+let lastFirePointerEvent=-100000;
+fireButton.addEventListener('pointerdown',e=>{
+ e.preventDefault();lastFirePointerEvent=performance.now();fireHeld=true;action();
+ if(fireButton.setPointerCapture)fireButton.setPointerCapture(e.pointerId);
+});
+for(const event of ['pointerup','pointercancel','lostpointercapture']){
+ fireButton.addEventListener(event,()=>{fireHeld=false;lastFirePointerEvent=performance.now();});
+}
+// Synthetic clicks (accessibility, mouse automation and some WebViews) can
+// produce click without pointerdown. The time guard avoids double firing on iOS.
+fireButton.addEventListener('click',()=>{
+ if(performance.now()-lastFirePointerEvent>350)action();
+});
 const stick=$('#stick'),knob=$('#knob');
 let stickId=null;
 function moveStick(e){
