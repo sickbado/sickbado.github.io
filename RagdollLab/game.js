@@ -116,7 +116,7 @@ function attach(part,geom,mat,scale,pos){const o=mesh(geom,mat,part);o.scale.set
 function mesh(geom,mat,group=world){const m=new THREE.Mesh(geom,mat);m.castShadow=true;m.receiveShadow=true;group.add(m);return m}
 function box(x,y,z,w,h,d,mat=materials.wall,group=world){const m=mesh(cube,mat,group);m.position.set(x,y,z);m.scale.set(w,h,d);return m}
 function lightbar(x,y,z,w=2.8){box(x,y,z,w,.065,.21,materials.lightStrip);box(x,y+.11,z,w+.2,.11,.34,materials.black)}
-const {createPremium}=await import('./premium.js?edition=1_0_startfix');
+const {createPremium}=await import('./premium.js?edition=1_0_selectorfinal');
 const premium=createPremium({THREE,renderer,scene,world,bodies,effects,materials,camera,mesh,box});
 premium.applyQuality('auto');
 function sign(text,x,y,z,color='#9df2e9',size=.62){
