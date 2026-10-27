@@ -4,7 +4,7 @@
 export function createPremium({THREE,renderer,scene,world,bodies,effects,materials,camera,mesh,box}) {
   const alive=new Set(), displayScreens=[], fans=[], casings=[], dust=[], splats=[];
   const clock=new THREE.Clock();
-  let quality='auto',frameAverage=1/60,slowFrames=0,qualityScale=1,requestedQuality='auto';
+  let quality='auto',frameAverage=1/60,slowFrames=0,qualityScale=1,requestedQuality='auto',xray=false;
   const lowQuality=/iPhone|iPad|iPod/.test(navigator.userAgent) && ((window.devicePixelRatio||1)>2);
   const vector=()=>new THREE.Vector3();
   const clamp=THREE.MathUtils.clamp;
@@ -171,6 +171,31 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
     d.head.scale.set(.203,.267,.19);
     d.details=new THREE.Group();bodies.add(d.details);
     d.detailsParts=[];
+    // Lightweight anatomical skeleton visible only in the medical radiography mode.
+    d.skeletonPieces=[];
+    const boneSegments=[
+      [0,1,.045],[1,2,.048],[2,3,.055],
+      [2,4,.037],[4,5,.031],[5,6,.021],
+      [2,7,.037],[7,8,.031],[8,9,.021],
+      [3,10,.051],[10,11,.038],[11,12,.03],
+      [3,13,.051],[13,14,.038],[14,15,.03]
+    ];
+    for(const [a,b,radius] of boneSegments){
+      const m=shape(palette.bone,sharedCylinder,bodies);
+      m.visible=xray;
+      d.skeletonPieces.push({a,b,radius,m});
+    }
+    d.skull=shape(palette.bone,organicHead,bodies);
+    d.skull.scale.set(.155,.21,.155);d.skull.visible=xray;
+    d.ribCage=new THREE.Group();bodies.add(d.ribCage);
+    for(let rib=0;rib<6;rib++){
+      const ring=shape(palette.bone,new THREE.TorusGeometry(.19+rib*.012,.013,6,18),d.ribCage);
+      ring.scale.set(1.23,.80,1);
+      ring.rotation.x=Math.PI/2;
+      ring.position.y=.11-rib*.08;
+    }
+    d.ribCage.visible=xray;
+
     // Suit detailing moves with torso.
     const chest=new THREE.Group();d.details.add(chest);d.detailsParts.push({anchor:'chest',g:chest});
     mb(chest,-.21,.12,.193,.055,.18,.015,palette.ceramic);
@@ -208,6 +233,18 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
     const spineQ=new THREE.Quaternion().setFromUnitVectors(up,spine.normalize());
     d.torso.quaternion.copy(spineQ);
     d.pelvis.quaternion.copy(spineQ);
+    if(d.skeletonPieces){
+      const up=new THREE.Vector3(0,1,0);
+      for(const b of d.skeletonPieces){
+        const a=d.points[b.a],c=d.points[b.b],between=c.clone().sub(a),length=Math.max(.005,between.length());
+        b.m.visible=xray;
+        b.m.position.copy(a).add(c).multiplyScalar(.5);
+        b.m.scale.set(b.radius,length,b.radius);
+        b.m.quaternion.setFromUnitVectors(up,between.normalize());
+      }
+      d.skull.position.copy(d.points[0]);d.skull.visible=xray;
+      d.ribCage.position.copy(d.torso.position);d.ribCage.quaternion.copy(spineQ);d.ribCage.visible=xray;
+    }
     for(const p of d.detailsParts){
       if(p.anchor==='chest'){
         p.g.position.copy(d.torso.position);p.g.quaternion.copy(spineQ);
@@ -261,6 +298,7 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
     }
   }
   function onImpact(d,pos,damage){createDust(pos,'smoke',Math.min(6,Math.ceil(damage/20)));}
+  function setXray(value){xray=Boolean(value)}
   function applyQuality(name){
     requestedQuality=name;
     quality=name;
@@ -297,5 +335,5 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
       const s=splats[j];s.age-=dt;if(s.age<0){effects.remove(s.mesh);s.mesh.geometry.dispose();splats.splice(j,1);}
     }
   }
-  return {addArena,enhanceDummy,updateDummy,onShot,onImpact,renderFrame,applyQuality,get quality(){return quality;}};
+  return {addArena,enhanceDummy,updateDummy,onShot,onImpact,renderFrame,applyQuality,setXray,get quality(){return quality;}};
 }
