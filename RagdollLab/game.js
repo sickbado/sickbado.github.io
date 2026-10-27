@@ -968,7 +968,7 @@ chooseQuality('auto');
 $('#medButton').addEventListener('click',()=>{medOpen=!medOpen;$('#medical').classList.toggle('open',medOpen);updateHud(rayTarget(75)?.d);});
 $('#medClose').addEventListener('click',()=>{medOpen=false;$('#medical').classList.remove('open')});
 $('#xrButton').addEventListener('click',()=>{
- xrOn=!xrOn;$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';
+ xrOn=!xrOn;premium.setXray(xrOn);$('#xrOverlay').classList.toggle('on',xrOn);$('#xrButton').style.color=xrOn?'#85f7e1':'';
  for(const m of [materials.dummy,materials.enemy,materials.skin,materials.skin2,materials.deadSkin,materials.coverall,materials.fabric,materials.trousers,materials.hair,materials.enemyJoint]){
   m.transparent=xrOn;m.opacity=xrOn?.18:1;m.depthWrite=!xrOn;m.needsUpdate=true;
  }
