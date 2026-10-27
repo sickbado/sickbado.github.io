@@ -2,7 +2,7 @@
 
 Progetto 3D originale e indipendente, pensato per Safari su iPhone e distribuito come Progressive Web App (PWA). Non è una conversione ufficiale di **Project C.A.R.L.** e non incorpora sorgenti o asset protetti di quel titolo.
 
-## Versione disponibile — 0.2
+## Versione disponibile — 0.5
 
 - Movimento in prima persona con joystick touch, visuale mediante trascinamento e comandi sparo/presa
 - Laboratorio 3D, torre di caduta sperimentale da 16 metri, modalità a ondate
@@ -12,6 +12,14 @@ Progetto 3D originale e indipendente, pensato per Safari su iPhone e distribuito
 - Prototipo sanitario: parametri di sangue, encefalo, cuore, polmoni, fegato, emorragia e fratture
 - Vista RX con organi semplificati in 3D
 - Salvataggio come app dalla schermata Home iOS (Safari > Condividi > Aggiungi alla schermata Home)
+
+## Fisica dei colpi — aggiornamento 0.5
+
+- Un proiettile normale non trasforma automaticamente il manichino in un ragdoll: i colpi non fatali provocano una breve animazione localizzata di contrazione e dolore.
+- Il ragdoll si attiva alla perdita di vitalità, con la physics gun o con il distacco dalla piattaforma.
+- Le onde d'urto delle esplosioni possono invece far perdere l'equilibrio. La spinta fisica è ora limitata a una piccola velocità iniziale.
+- Danni alle gambe riducono la naturalezza della falcata, mostrando una lieve zoppia.
+- La reazione al colpo non equivale a un modello clinico preciso o a una simulazione balistica certificata.
 
 ## Differenze sostanziali dall'originale
 
