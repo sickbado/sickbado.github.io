@@ -300,14 +300,14 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
   }
   function onImpact(d,pos,damage){createDust(pos,'smoke',Math.min(6,Math.ceil(damage/20)));}
   function setXray(value){xray=Boolean(value)}
-  function resetScene(externalGeometries=[]){
+  function resetScene(externalGeometries=[],only='all'){
     const protectedG=new Set([
       sharedCylinder,round,plane,torsoShape,pelvisShape,organicLimb,organicHead,cheekShape,smallCap,
       ...externalGeometries
     ]);
     const stableMaterials=new Set([...Object.values(materials),...Object.values(palette)]);
     const encounteredG=new Set(),encounteredM=new Set();
-    for(const group of [world,bodies,effects]){
+    for(const group of (only==='bodies'?[bodies]:[world,bodies,effects])){
       group.traverse(object=>{
         if(object.geometry && !protectedG.has(object.geometry) && !encounteredG.has(object.geometry)){
           encounteredG.add(object.geometry);object.geometry.dispose();
@@ -322,9 +322,10 @@ export function createPremium({THREE,renderer,scene,world,bodies,effects,materia
       });
       group.clear();
     }
-    displayScreens.length=0;
-    fans.length=0;
-    casings.length=0;dust.length=0;splats.length=0;
+    if(only!=='bodies'){
+      displayScreens.length=0;fans.length=0;
+      casings.length=0;dust.length=0;splats.length=0;
+    }
   }
   function applyQuality(name){
     requestedQuality=name;
