@@ -269,7 +269,7 @@ function buildArena(mode){
     box(0,2.63,-6,3.6,.17,3.9,materials.steel);
     lightbar(0,2.48,-6,2.3);
   }
-  premium.addArena(mode);
+  if(!safeMode)premium.addArena(mode);
 }
 const jointTemplate=[
   [0,1.86,0], [0,1.57,0], [0,1.30,0], [0,.97,0],
@@ -286,6 +286,8 @@ const bones=[
 ];
 const braces=[[1,4],[1,7],[4,3],[7,3],[4,10],[7,13],[10,13],[5,2],[8,2]];
 let dummies=[],particles=[],decals=[],mode='lab',tool='pistol',playing=false,held=null;
+let safeMode=new URLSearchParams(location.search).get('safe')==='1';
+let recoveryAttempted=false,contextLost=false;
 let medOpen=false,xrOn=false;
 let health=100,wave=0,score=0,nextWaveAt=0,shake=0,lastShot=0,lastTime=0;
 const tempA=V(),tempB=V(),tmp=V(),ray=new THREE.Ray(),up=V(0,1,0);
@@ -365,7 +367,7 @@ function makeDummy(x,z,y=0,isEnemy=false){
     m.visible=xrOn;anatomy.push({organ,m,offset:pos});
   }
   d.anatomy=anatomy;
-  premium.enhanceDummy(d);
+  if(!safeMode)premium.enhanceDummy(d);
   dummies.push(d);pose(d);return d;
 }
 function pose(d){
@@ -400,7 +402,7 @@ function pose(d){
     wound.mesh.position.z+=wound.front;
     wound.mesh.rotation.z=wound.twist;
   }
-  premium.updateDummy(d,performance.now());
+  if(!safeMode)premium.updateDummy(d,performance.now());
 }
 function animateLiving(d,time){
   if(d.physics)return;
@@ -846,7 +848,7 @@ function hitPhysics(d,point,index,dir,damage,force,bleedScale,kind){
     registerHitReaction(d,index,dir,damage);
   }
   bloodBurst(point,dir,Math.min(13,Math.ceil(damage/8)+2));
-  premium.onImpact(d,point,damage);
+  if(!safeMode)premium.onImpact(d,point,damage);
   if(d.life<=0&&prevLife>0){
     say(d.enemy?'BERSAGLIO NEUTRALIZZATO · '+score:'SEGNI VITALI ASSENTI',1250);
   }else if(!d.enemy){say(zoneOf(index)+' · '+Math.round(d.life)+'% integrità',700)}
@@ -898,7 +900,7 @@ function action(){
   if(tool==='grenade'){
     const hit=rayTarget(80);
     const pos=hit?hit.point.clone():camera.position.clone().addScaledVector(baseDir,10);
-    tracer(start,pos,tool);premium.onShot(tool,hit,pos,baseDir);detonate(pos,baseDir);updateHud(hit?.d);return;
+    tracer(start,pos,tool);if(!safeMode)premium.onShot(tool,hit,pos,baseDir);detonate(pos,baseDir);updateHud(hit?.d);return;
   }
   let target=null;
   for(let i=0;i<weapon.pellets;i++){
@@ -907,7 +909,7 @@ function action(){
     const hit=rayTarget(80,dir);
     const point=hit?hit.point.clone():worldImpactPoint(dir,56);
     if(i===0||tool==='shotgun'&&i%2===0)tracer(start,point,tool);
-    if(i===0)premium.onShot(tool,hit,point,dir);
+    if(i===0&&!safeMode)premium.onShot(tool,hit,point,dir);
     if(hit){
       const damage=hit.i===0?weapon.damage*1.55:weapon.damage;
       hitPhysics(hit.d,hit.point,hit.i,dir,damage,weapon.push,weapon.bleed,'FERITA');
@@ -940,17 +942,54 @@ function updateHud(aimed){
 }
 let hintTimer=0;
 function say(t,ms=1800){const el=$('#hint');el.textContent=t;el.classList.add('visible');clearTimeout(hintTimer);hintTimer=setTimeout(()=>el.classList.remove('visible'),ms)}
-function startGame(newMode){
-  mode=newMode;playing=true;home.style.display='none';overlay.style.display='block';
-  premium.applyQuality(qualityChoice);
-  for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
-  reloading='';lastShot=-100000;setAim(false);refreshAmmo();
-  try{$('#rotate').classList.remove('off');buildArena(mode);spawnForMode();changeTool('pistol');}catch(error){window.__ragdollReport?.(error);throw error;}
-  if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
+function reportFatal(error){
+ window.__ragdollReport?.(error);
+ console.error('Ragdoll Lab renderer error',error);
 }
-function reset(){held=null;reloading='';for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;buildArena(mode);spawnForMode();changeTool('pistol');updateHud()}
-function goHome(){playing=false;home.style.display='flex';overlay.style.display='none';$('#rotate').classList.add('off');fireHeld=false;setAim(false);
-  if(document.pointerLockElement)document.exitPointerLock();}
+function recoverToSafe(error){
+ console.warn('Ragdoll Lab: switching to compatibility scene',error);
+ if(recoveryAttempted){
+   reportFatal(error);
+   playing=false;
+   return false;
+ }
+ recoveryAttempted=true;
+ safeMode=true;
+ window.__ragdollErrors?.push('Compatibility recovery: '+String(error?.stack||error));
+ try{
+   buildArena(mode);
+   spawnForMode();
+   changeTool('pistol');
+   $('#fatal').style.display='none';
+   say('Modalità compatibilità: scenario 3D ripristinato',3800);
+   return true;
+ }catch(secondary){
+   reportFatal(secondary);
+   playing=false;
+   return false;
+ }
+}
+function startGame(newMode){
+ mode=newMode;playing=true;home.style.display='none';overlay.style.display='block';
+ recoveryAttempted=false;
+ premium.applyQuality(safeMode?'fluida':qualityChoice);
+ for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
+ reloading='';lastShot=-100000;setAim(false);refreshAmmo();
+ $('#rotate').classList.remove('off');
+ try{buildArena(mode);spawnForMode();changeTool('pistol');}
+ catch(error){recoverToSafe(error);}
+ if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
+}
+function reset(){
+ held=null;reloading='';for(const [name,size] of Object.entries(magazineSize))ammo[name]=size;
+ try{buildArena(mode);spawnForMode();changeTool('pistol');updateHud();}
+ catch(error){recoverToSafe(error);}
+}
+function goHome(){
+ playing=false;home.style.display='flex';overlay.style.display='none';
+ $('#rotate').classList.add('off');fireHeld=false;setAim(false);
+ if(document.pointerLockElement)document.exitPointerLock();
+}
 $$('.modebtn').forEach(btn=>btn.addEventListener('click',()=>{
   $$('.modebtn').forEach(b=>b.classList.toggle('active',b===btn));
 }));
@@ -1111,30 +1150,44 @@ function updateEffects(dt){
   }
 }
 function tick(time){
-  requestAnimationFrame(tick);
-  const rawDt=Math.max(.001,(time-lastTime)/1000||.016);
-  const dt=Math.min(.032,rawDt);lastTime=time;
-  if(playing){
-    if(reloading && time>=reloadEnds){ammo[reloading]=magazineSize[reloading];reloading='';playSound(920,.08,.035);refreshAmmo();}
+ requestAnimationFrame(tick);
+ const rawDt=Math.max(.001,(time-lastTime)/1000||.016);
+ const dt=Math.min(.032,rawDt);lastTime=time;
+ if(playing&&!contextLost){
+  try{
+    if(reloading && time>=reloadEnds){
+      ammo[reloading]=magazineSize[reloading];reloading='';
+      playSound(920,.08,.035);refreshAmmo();
+    }
     if(muzzleAge>0){muzzleAge-=dt;if(muzzleAge<=0){if(muzzleFlash)muzzleFlash.visible=false;if(muzzleLight)muzzleLight.intensity=0;}}
     movePlayer(dt);
     if(fireHeld&&weapons[tool]?.automatic)action();
     currentRay();
-    if(held&&held.d){ // Keep grab target at the original distance while looking around
-      if(!held.d.alive&&mode==='zombies')held=null;
-    }
+    if(held&&held.d && !held.d.alive && mode==='zombies')held=null;
     updateEnemies(dt,time);
     for(const d of dummies){
       animateLiving(d,time);simulate(d,dt);medicalTick(d,dt);pose(d);
     }
     updateEffects(dt);
-    premium.renderFrame(Math.min(.12,rawDt),time);
+    if(!safeMode)premium.renderFrame(Math.min(.12,rawDt),time);
     if((Math.floor(time/150)%4)===0){
       const target=rayTarget(75);
       if(target&&target.d)updateHud(target.d);
     }
     if(mode==='zombies')updateHud();
-  }
-  renderer.render(scene,camera);
+  }catch(error){recoverToSafe(error);}
+ }
+ if(!contextLost){
+   try{renderer.render(scene,camera);}catch(error){recoverToSafe(error);}
+ }
 }
+canvas.addEventListener('webglcontextlost',event=>{
+ event.preventDefault();contextLost=true;
+ window.__ragdollErrors?.push('WebGL context lost on iPhone');
+});
+canvas.addEventListener('webglcontextrestored',()=>{
+ contextLost=false;
+ renderer.setSize(innerWidth,innerHeight);
+ if(playing)recoverToSafe(new Error('WebGL context restored'));
+});
 requestAnimationFrame(tick);
