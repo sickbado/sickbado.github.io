@@ -133,7 +133,8 @@ function addFloorCollider(m,padding=0){
 }
 function buildArena(mode){
   colliders.length=0;
-  world.clear(); bodies.clear();effects.clear(); dummies.length=0;particles.length=0;decals.length=0;held=null;
+  premium.resetScene([cube,sphere,cylinder]);
+  dummies.length=0;particles.length=0;decals.length=0;held=null;
   const walls=mode==='tower'?30:26;
   box(0,-.24,-1,walls,.48,34,materials.floor);
   const grid=new THREE.GridHelper(walls,26,0x334e51,0x28353b);grid.position.set(0,.008,-1);world.add(grid);grid.material.opacity=.26;grid.material.transparent=true;
@@ -601,7 +602,7 @@ function spawnWave(){
   // Remove previous fallen wave before spawning the next one. Otherwise
   // dozens of inactive articulated characters accumulate in Safari memory.
   if(dummies.length && dummies.every(d=>!d.alive || !d.enemy)){
-    bodies.clear();dummies.length=0;held=null;
+    premium.resetScene([cube,sphere,cylinder],'bodies');dummies.length=0;held=null;
   }
   wave++;nextWaveAt=0;
   const count=Math.min(2+wave,7);
