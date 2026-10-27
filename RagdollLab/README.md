@@ -1,44 +1,40 @@
-# Ragdoll Lab — Mobile
+# Ragdoll Lab — iPhone Edition 1.0
 
-Progetto 3D originale e indipendente, pensato per Safari su iPhone e distribuito come Progressive Web App (PWA). Non è una conversione ufficiale di **Project C.A.R.L.** e non incorpora sorgenti o asset protetti di quel titolo.
+**Gioca:** https://sickbado.github.io/RagdollLab/
 
-## Versione disponibile — 0.5
+Videogioco 3D originale per Safari su iPhone, nato come alternativa indipendente per chi desidera un simulatore ragdoll, con sandbox fisico, armi, impatti e diagnostica. **Non è la versione ufficiale né una conversione identica di Project C.A.R.L.** Non utilizza né distribuisce i modelli, le scene o il codice proprietario del gioco Windows.
 
-- Movimento in prima persona con joystick touch, visuale mediante trascinamento e comandi sparo/presa
-- Laboratorio 3D, torre di caduta sperimentale da 16 metri, modalità a ondate
-- Ragdoll multi-articolato con vincoli di distanza
-- Sei categorie di armi con effetti differenziati: 9mm, SMG, AK, .308, fucile a pompa, granata
-- Physics gun, sgancio del manichino, effetti di colpo, danni localizzati, reazione agli impatti
-- Prototipo sanitario: parametri di sangue, encefalo, cuore, polmoni, fegato, emorragia e fratture
-- Vista RX con organi semplificati in 3D
-- Salvataggio come app dalla schermata Home iOS (Safari > Condividi > Aggiungi alla schermata Home)
+## Contenuti dell'edizione consolidata
 
-## Fisica dei colpi — aggiornamento 0.5
+- **Tre modalità:** laboratorio di ricerca con più manichini, torre per test di caduta da 16 metri, sopravvivenza a ondate con nemici in movimento.
+- **Personaggi più elaborati:** figure costruite con forme organiche, testa e volto, uniformi, scarpe e dettagli 3D. Respirazione, camminata, reazioni localizzate, lieve zoppia e cadute ragdoll.
+- **Fisica dei proiettili più credibile:** gli impatti non letali generano contrazioni senza scaraventare il corpo; la dinamica di caduta si attiva quando il soggetto è incapacitato, manipolato o soggetto a un'onda d'urto. Le collisioni con superfici e piattaforme sono semplificate.
+- **Sei categorie di armi e physics gun:** pistola, SMG, fucile automatico, fucile di precisione, fucile a pompa, granata, con caratteristiche distinte, effetti sul bersaglio, bossoli, rinculo, mira ravvicinata, caricatore e ricarica.
+- **Diagnostica e radiografia:** monitoraggio approssimativo di sangue, organi, emorragia e ferite; RX con scheletro articolato, cranio, costole e organi tridimensionali semplificati.
+- **Ambientazione industriale:** architettura, laboratori di analisi, postazioni monitor, porte, apparecchi di test, luci, materiali procedurali e dettagli di scena.
+- **Mobile first:** due joystick/gesture area (sinistra per il movimento, trascina il gioco per guardare), pulsanti MIRA, SPARA e AGGANCIA, barra degli strumenti scorrevole.
+- **Profili grafici:** AUTOMATICA, QUALITÀ o FLUIDITÀ; la modalità automatica abbassa la risoluzione di rendering se rileva un calo di frame rate sostenuto.
+- **PWA installabile:** da Safari scegliere Condividi → Aggiungi alla schermata Home. Prima apertura con rete; il service worker tenta di conservare motore e asset per l'uso successivo offline, senza garanzia su tutte le condizioni.
 
-- Un proiettile normale non trasforma automaticamente il manichino in un ragdoll: i colpi non fatali provocano una breve animazione localizzata di contrazione e dolore.
-- Il ragdoll si attiva alla perdita di vitalità, con la physics gun o con il distacco dalla piattaforma.
-- Le onde d'urto delle esplosioni possono invece far perdere l'equilibrio. La spinta fisica è ora limitata a una piccola velocità iniziale.
-- Danni alle gambe riducono la naturalezza della falcata, mostrando una lieve zoppia.
-- La reazione al colpo non equivale a un modello clinico preciso o a una simulazione balistica certificata.
+## Controlli
 
-## Differenze sostanziali dall'originale
+**iPhone in orizzontale:** joystick a sinistra per muoversi, trascinare lo schermo per orientare lo sguardo, SPARA per usare l'arma, MIRA per restringere il campo visivo, RICARICA per reintegrare il caricatore. La physics gun consente di agganciare un manichino e muoverlo cambiando la direzione di mira.
 
-Le interazioni attuali sono una simulazione semplificata. Il gioco originale usa un modello scheletrico/anatomico proprietario e simulazioni avanzate di lesioni, sistema vascolare, balistica, sanguinamento e comportamento fisico, sviluppati in Unity. Per ottenere la **stessa identica esperienza** è necessario il progetto Unity originale, il suo codice sorgente, gli asset autorizzati e il porting iOS con ottimizzazioni specifiche. L'archivio Windows 0.8.71 contiene un prodotto Unity compilato (IL2CPP), non i sorgenti riutilizzabili per ricostruire direttamente l'app iOS.
+**PC:** WASD per muoversi, trascinare il mouse per orientarsi, click per sparare, tasti 1–8 per gli strumenti, F per ricaricare, Shift per mirare, R per ripristinare.
 
-## Roadmap — fedeltà funzionale
+## Limiti tecnici noti
 
-1. Sostituire il solver dei vincoli con ragdoll articolati rigidi e collisioni reali usando un motore fisico 3D.
-2. Modellare un umano originale con scheletro e organi anatomici più dettagliati.
-3. Rendere i danni dipendenti dalla penetrazione e dall'energia del singolo proiettile e dalle strutture anatomiche colpite.
-4. Simulare volume ematico, emorragie da ferita, macchie e raccolte sul suolo più fedeli, entro i limiti prestazionali dell'iPhone.
-5. Ricostruire ambienti e oggetti mobili con meccaniche di interazione, migliorando texture, animazioni e audio.
-6. Migliorare AI degli zombie, armi, interfaccia e sessioni più lunghe.
-7. Profilazione WebGL/Safari su iPhone reale, riduzione memoria, tuning per 30/60 FPS.
+Questa è una simulazione **approssimata** realizzata in Three.js con un solver ragdoll e modelli procedurali. Non equivale alla biomeccanica, alle animazioni cinematiche, alla resa grafica professionale e alla simulazione vascolare del titolo Unity di riferimento. La fluidità dipende dal dispositivo, dalla versione di Safari e dall'eventuale carico termico. Alcune interazioni possono richiedere ulteriori affinamenti su iPhone fisico.
 
-## Esecuzione
+Per un porting realmente identico al gioco Windows è necessario disporre del progetto Unity, dei sorgenti e degli asset con i relativi diritti di utilizzo.
 
-Aprire https://sickbado.github.io/RagdollLab/ da Safari. Serve una connessione alla prima apertura per caricare il motore 3D. Le risorse già caricate possono essere conservate in cache, ma la disponibilità completamente offline non è ancora certificata.
+## File
 
-## Proprietà intellettuale
+- `index.html`: interfaccia e schermata di avvio.
+- `game.js`: gameplay, fisica, controlli, armi e vitali.
+- `premium.js`: grafica aggiuntiva, asset procedurali, dettagli 3D e ottimizzazioni.
+- `manifest.webmanifest`, `sw.js`, `icon.svg`: installazione iOS e caching.
 
-Il progetto è una creazione indipendente ispirata al genere sandbox fisico; non deve essere presentato come un prodotto ufficiale, né distribuire asset originali di terzi senza autorizzazione.
+## Attribuzione
+
+Progetto autonomo ispirato al genere *ragdoll injury sandbox*. Project C.A.R.L. appartiene al rispettivo autore. Le risorse visuali del nostro prototipo sono generate tramite codice originale; Three.js è utilizzato come libreria di rendering secondo la sua licenza.
