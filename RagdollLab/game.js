@@ -112,7 +112,7 @@ function attach(part,geom,mat,scale,pos){const o=mesh(geom,mat,part);o.scale.set
 
 function mesh(geom,mat,group=world){const m=new THREE.Mesh(geom,mat);m.castShadow=true;m.receiveShadow=true;group.add(m);return m}
 function box(x,y,z,w,h,d,mat=materials.wall,group=world){const m=mesh(cube,mat,group);m.position.set(x,y,z);m.scale.set(w,h,d);return m}
-function lightbar(x,y,z,w=2.8){box(x,y,z,w,.07,.24,materials.teal);box(x,y+.12,z,w+.45,.1,.37,materials.black)}
+function lightbar(x,y,z,w=2.8){box(x,y,z,w,.065,.21,materials.lightStrip);box(x,y+.11,z,w+.2,.11,.34,materials.black)}
 function sign(text,x,y,z,color='#9df2e9',size=.62){
   const c=document.createElement('canvas');c.width=512;c.height=128;const ct=c.getContext('2d');
   ct.fillStyle='#09151c';ct.fillRect(0,0,512,128);ct.strokeStyle='#477077';ct.lineWidth=6;ct.strokeRect(4,4,504,120);
@@ -142,6 +142,68 @@ function buildArena(mode){
     box(x,2.4,15.32,.08,4.5,.06,materials.steel);
   }
   sign('RAGDOLL LAB',0,5.2,-16.55);
+  // Laboratory flooring, wall paneling, bracing, warning stripes and signage
+  for(let x=-13;x<=13;x+=4.3){
+    for(let z=-15;z<=14;z+=5.1){
+      const rivet=box(x,.012,z,.05,.015,.05,materials.steel);
+      rivet.rotation.y=Math.PI/4;
+    }
+  }
+  for(const side of [-1,1]){
+    for(let z=-13;z<=12;z+=3.65){
+      const w=box(side*14.65,4.1,z,.042,3.1,2.6,materials.wall2);
+      box(side*14.58,5.2,z,.07,.055,2.35,materials.steel);
+      box(side*14.55,2.8,z,.07,.045,2.35,materials.steel);
+      const trim=box(side*14.5,1.1,z,.08,.045,1.9,materials.teal);
+      box(side*14.58,.52,z,.12,.33,2.8,materials.black);
+    }
+  }
+  // Realistic bench assemblies and ceiling cable trays
+  for(let side of [-1,1]){
+    for(let z of [-9,2.5]){
+      const x=side*9.8;
+      box(x,.82,z,2.7,.13,1.35,materials.steel);
+      box(x,.89,z,2.75,.045,1.4,materials.black);
+      for(let leg of [-1.1,1.1])for(let depth of [-.47,.47]){
+        box(x+leg,.39,z+depth,.13,.79,.14,materials.steel);
+      }
+      const monitorStand=box(x,1.14,z-.31,.11,.47,.11,materials.steel);
+      const screen=box(x,1.51,z-.38,1.18,.78,.11,materials.black);
+      const glow=box(x,1.51,z-.31,1.06,.65,.012,materials.monitor);
+      const kb=box(x,.96,z+.35,.9,.034,.28,materials.black);
+      for(let n=0;n<9;n++){
+        box(x-.37+n*.09,.982,z+.35,.052,.008,.17,materials.steel);
+      }
+      box(x+1.02,1.00,z+.26,.16,.19,.16,materials.pale);
+    }
+  }
+  for(let z=-11;z<14;z+=7){
+    box(-1,7.66,z,23,.14,.34,materials.steel);
+    for(let x=-11;x<=10;x+=2){
+      box(x,7.57,z,.08,.095,.37,materials.black);
+    }
+  }
+  // Backwall industrial cabinets and pipes
+  for(let x of [-10,-5,5,10]){
+    box(x,1.53,-16.04,2.05,3.0,.55,materials.steel);
+    box(x,1.56,-15.72,1.89,2.78,.026,materials.wall2);
+    box(x+.67,1.57,-15.69,.08,.30,.045,materials.orange);
+    box(x-.66,2.72,-15.69,.32,.035,.04,materials.lightStrip);
+  }
+  for(let y of [3.4,4.0])for(let z of [-16.5,15.0]){
+    const pipe=box(0,y,z,29,.105,.105,materials.steel);
+    box(0,y+.11,z,29,.035,.04,materials.black);
+  }
+  for(let z of [-8,1,10]){
+    box(0,7.72,z,1.8,.12,.65,materials.black);
+    box(0,7.60,z,1.55,.055,.54,materials.lightStrip);
+  }
+  // Simple baked shadows under key structures, cheap for mobile GPU
+  const shadowMaterial=new THREE.MeshBasicMaterial({color:0x080f14,transparent:true,opacity:.2,depthWrite:false});
+  for(let x of [-9.8,9.8])for(let z of [-9,2.5]){
+    const sh=mesh(new THREE.CircleGeometry(2,18),shadowMaterial,world);
+    sh.position.set(x,.015,z);sh.rotation.x=-Math.PI/2;sh.scale.set(1.5,.9,1);
+  }
   // Interactive-looking displays & props
   for(let x of [-12.5,12.5]){
     for(let z of [-11,-1,9]){
@@ -473,11 +535,68 @@ function translateDummy(d,dx,dz){
 const player={x:0,y:1.65,z:7};
 let yaw=0,pitch=0,joyX=0,joyY=0,keys=new Set(),aimPointer=null,lookX=0,lookY=0,fireHeld=false;
 let heldAudio=null;
-function makeGun(){
-  gun.clear();const a=box(.24,-.21,-.55,.19,.2,.55,materials.black,gun);a.rotation.x=-.07;
-  box(.24,-.12,-.86,.075,.075,.46,materials.steel,gun);
-  box(.24,-.26,-.34,.12,.33,.11,materials.black,gun);
-  box(.24,-.04,-.62,.05,.04,.3,materials.teal,gun);
+let recoil=0,muzzleAge=0,muzzleFlash=null,muzzleLight=null;
+function makeGun(kind='pistol'){
+  gun.clear(); gun.position.set(0,0,0);gun.rotation.set(0,0,0);gun.scale.setScalar(1);
+  const long=['smg','rifle','sniper','shotgun','physics'].includes(kind);
+  const grip=long?.32:.22;
+  const x=.27,y=-.245,z=long?-.55:-.49,barrelZ=long?-1.25:-.79;
+  const iron=materials.black,steel=materials.steel,poly=materials.rubber;
+  box(x,y,z,long?.22:.16,.17,long?.66:.40,iron,gun);
+  const barrel=mesh(new THREE.CylinderGeometry(long?.044:.031,long?.044:.031,long?.72:.32,12),
+    steel,gun);barrel.position.set(x,y+.015,barrelZ+(long?.35:.15));barrel.rotation.x=Math.PI/2;
+  const mouth=mesh(new THREE.CylinderGeometry(.053,.053,.09,14),iron,gun);
+  mouth.position.set(x,y+.015,barrelZ-.02);mouth.rotation.x=Math.PI/2;
+  if(kind==='rifle'||kind==='sniper'){
+    box(x,y+.075,z+.17,.28,.16,.46,materials.fabric,gun);
+    box(x,y-.13,z+.17,.13,.24,.14,poly,gun);
+    box(x-.01,y+.14,z-.10,.13,.08,.5,steel,gun);
+    box(x,y+.22,z-.18,.17,.07,.23,iron,gun);
+    if(kind==='sniper'){
+      box(x,y+.225,z-.12,.26,.12,.42,materials.black,gun);
+      for(let zz of [z-.31,z+.08]){
+        const ring=mesh(new THREE.TorusGeometry(.095,.023,8,14),steel,gun);
+        ring.position.set(x,y+.22,zz);
+      }
+    }else{
+      box(x-.03,y-.12,z+.28,.15,.31,.12,materials.fabric,gun);
+    }
+    box(x,y-.13,z-.2,.23,.11,.34,materials.fabric,gun);
+  }else if(kind==='shotgun'){
+    box(x,y-.067,barrelZ+.22,.19,.115,.65,materials.fabric,gun);
+    for(const zz of [-.85,-.75,-.65,-.55])box(x,y-.035,zz,.2,.025,.023,iron,gun);
+    box(x,y-.22,z+.22,.1,.24,.13,poly,gun);
+  }else if(kind==='smg'){
+    box(x,y+.13,z-.14,.22,.10,.34,materials.fabric,gun);
+    box(x,y-.23,z+.05,.11,.36,.13,poly,gun);
+    box(x,y-.13,z+.40,.18,.10,.36,steel,gun);
+  }else if(kind==='physics'){
+    box(x,y+.15,z-.15,.33,.16,.42,materials.black,gun);
+    for(const side of [-1,1]){
+      const rail=box(x+side*.16,y-.03,z-.25,.035,.16,.74,materials.teal,gun);
+      rail.rotation.x=.06;
+      const tip=mesh(sphere,materials.teal,gun);
+      tip.position.set(x+side*.15,y-.005,barrelZ-.01);tip.scale.setScalar(.07);
+    }
+  }else if(kind==='grenade'){
+    const pod=mesh(round,materials.steel,gun);
+    pod.position.set(x,y, -.59);pod.scale.set(.15,.21,.16);
+    const ring=mesh(new THREE.TorusGeometry(.05,.012,8,13),materials.orange,gun);
+    ring.position.set(x+.08,y+.23,-.57);
+  }else{
+    box(x,y+.1,z-.08,.16,.08,.42,steel,gun);
+    box(x,y-.19,z+.13,.12,.3,.12,poly,gun);
+    box(x,y-.03,z+.28,.18,.10,.13,iron,gun);
+  }
+  // First-person hand mesh keeps the weapon visually grounded.
+  const hand=mesh(round,materials.skin,gun);
+  hand.position.set(x+.01,y-.18,z+.16);hand.scale.set(.11,.17,.11);
+  const wrist=mesh(cylinder,materials.fabric,gun);
+  wrist.position.set(x+.02,y-.34,z+.24);wrist.scale.set(.115,.2,.11);
+  const muzzle=mesh(new THREE.ConeGeometry(long?.11:.08,long?.24:.18,8),
+   new THREE.MeshBasicMaterial({color:0xffd98e,transparent:true,opacity:.85,depthWrite:false}),gun);
+  muzzle.rotation.x=-Math.PI/2;muzzle.position.set(x,y+.01,barrelZ-.15);muzzle.visible=false;muzzleFlash=muzzle;
+  muzzleLight=new THREE.PointLight(0xffca80,0,4,2);muzzleLight.position.copy(muzzle.position);gun.add(muzzleLight);
 }
 makeGun();
 const weapons={
@@ -493,9 +612,7 @@ function changeTool(name){
   $$('.tool').forEach(b=>b.classList.toggle('active',b.dataset.tool===tool));
   const info={physics:'Physics gun · aggancia o lascia il bersaglio',drop:'Caduta · libera il manichino'};
   say(weapons[name]?.label||info[name]||'',1850);
-  gun.children.forEach(m=>{if(m.material===materials.teal)m.visible=(name==='physics')});
-  const long=name==='sniper'||name==='rifle'||name==='shotgun';
-  gun.scale.set(1,1,long?1.45:name==='grenade'?.45:1);
+  makeGun(name);
   $('#fire').textContent=name==='physics'?'✥':name==='drop'?'↓':name==='grenade'?'◉':'●';
 }
 function currentRay(){camera.getWorldDirection(tempA);ray.set(camera.position,tempA);return ray}
@@ -617,6 +734,9 @@ function action(){
   const now=performance.now();
   if(now-lastShot<weapon.cooldown)return;
   lastShot=now;
+  recoil=Math.min(.18,recoil+(tool==='sniper'?.14:tool==='shotgun'?.12:tool==='rifle'?.045:.055));
+  muzzleAge=.065;if(muzzleFlash)muzzleFlash.visible=tool!=='grenade';
+  if(muzzleLight)muzzleLight.intensity=tool==='grenade'?0:7;
   const baseDir=camera.getWorldDirection(V()),start=camera.position.clone().addScaledVector(baseDir,.5);
   playSound(weapon.sound,tool==='grenade'?.16:.095,tool==='shotgun'?.11:.068);
   shake=(tool==='sniper'||tool==='shotgun')?.05:.019;
@@ -744,7 +864,11 @@ function movePlayer(dt){
   camera.rotation.y=yaw;camera.rotation.x=pitch;
   if(shake>0){camera.rotation.z=(Math.random()-.5)*shake;shake*=.78;if(shake<.0008)shake=0;}
   else camera.rotation.z=0;
-  gun.rotation.z=Math.sin(performance.now()*.003)*.025;
+  recoil*=.82;
+  gun.position.z=recoil*.85;
+  gun.position.y=-recoil*.35;
+  gun.rotation.x=-recoil*.9+Math.sin(performance.now()*.0021)*.005;
+  gun.rotation.z=Math.sin(performance.now()*.003)*.014;
 }
 function updateEnemies(dt,time){
   if(mode!=='zombies')return;
@@ -787,6 +911,7 @@ function tick(time){
   requestAnimationFrame(tick);
   const dt=Math.min(.032,Math.max(.001,(time-lastTime)/1000||.016));lastTime=time;
   if(playing){
+    if(muzzleAge>0){muzzleAge-=dt;if(muzzleAge<=0){if(muzzleFlash)muzzleFlash.visible=false;if(muzzleLight)muzzleLight.intensity=0;}}
     movePlayer(dt);
     if(fireHeld&&weapons[tool]?.automatic)action();
     currentRay();
