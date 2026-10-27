@@ -1,4 +1,4 @@
-/* RAGDOLL LAB v0.3 — standalone original web game. Three.js is used as an external rendering library. */
+/* RAGDOLL LAB v0.4 — standalone original web game. Three.js is used as an external rendering library. */
 let THREE;
 try { THREE = await import('https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js'); }
 catch (error) {
@@ -30,6 +30,7 @@ const amber=new THREE.PointLight(0xf4a564,24,20,2); amber.position.set(6,6,-8); 
 const world=new THREE.Group();scene.add(world);
 const bodies=new THREE.Group();scene.add(bodies);
 const effects=new THREE.Group();scene.add(effects);
+const colliders=[];
 const gun=new THREE.Group();camera.add(gun);scene.add(camera);
 const materials={
   floor:new THREE.MeshStandardMaterial({color:0x263543,roughness:.8,metalness:.2}),
@@ -42,6 +43,8 @@ const materials={
   orange:new THREE.MeshStandardMaterial({color:0xffbd70,emissive:0x5b2d09,emissiveIntensity:.6}),
   red:new THREE.MeshStandardMaterial({color:0xa92932,roughness:.64}),
   blood:new THREE.MeshStandardMaterial({color:0x8f101e,roughness:.64}),
+  wound:new THREE.MeshStandardMaterial({color:0x550913,roughness:.88,side:THREE.DoubleSide}),
+  woundedCloth:new THREE.MeshStandardMaterial({color:0x56151d,roughness:.95,side:THREE.DoubleSide}),
   white:new THREE.MeshStandardMaterial({color:0xe0e8df,roughness:.67,metalness:.09}),
   dummy:new THREE.MeshStandardMaterial({color:0xb4c0bd,roughness:.63,metalness:.14}),
   dummyJoint:new THREE.MeshStandardMaterial({color:0x414f56,metalness:.72,roughness:.35}),
@@ -121,7 +124,12 @@ function sign(text,x,y,z,color='#9df2e9',size=.62){
   const panel=mesh(new THREE.PlaneGeometry(4*size,size),material);panel.position.set(x,y,z);
   return panel;
 }
+function addFloorCollider(m,padding=0){
+  colliders.push({x:m.position.x,z:m.position.z,halfX:m.scale.x/2+padding,halfZ:m.scale.z/2+padding,top:m.position.y+m.scale.y/2});
+  return m;
+}
 function buildArena(mode){
+  colliders.length=0;
   world.clear(); bodies.clear();effects.clear(); dummies.length=0;particles.length=0;decals.length=0;held=null;
   const walls=mode==='tower'?30:26;
   box(0,-.24,-1,walls,.48,34,materials.floor);
@@ -163,7 +171,7 @@ function buildArena(mode){
     for(let z of [-9,2.5]){
       const x=side*9.8;
       box(x,.82,z,2.7,.13,1.35,materials.steel);
-      box(x,.89,z,2.75,.045,1.4,materials.black);
+      addFloorCollider(box(x,.89,z,2.75,.045,1.4,materials.black),.03);
       for(let leg of [-1.1,1.1])for(let depth of [-.47,.47]){
         box(x+leg,.39,z+depth,.13,.79,.14,materials.steel);
       }
@@ -215,7 +223,7 @@ function buildArena(mode){
   for(let n=0;n<6;n++){
     let bx=-8+(n%3)*7,bz=-11+Math.floor(n/3)*18;
     box(bx,.43,bz,1.16,.84,1.16,materials.steel);
-    box(bx,.88,bz,1.19,.08,1.19,materials.black);
+    addFloorCollider(box(bx,.88,bz,1.19,.08,1.19,materials.black),.05);
     box(bx,.95,bz,.8,.025,.04,materials.orange);
   }
   // Floor warnings
@@ -233,14 +241,14 @@ function buildArena(mode){
       }
     }
     for(let y=0;y<=16;y+=2){box(-2.8,y,-6,.12,.12,8,materials.steel);box(2.8,y,-6,.12,.12,8,materials.steel);}
-    box(0,16,-3.3,5.8,.28,3.7,materials.black);
+    addFloorCollider(box(0,16,-3.3,5.8,.28,3.7,materials.black));
     box(0,16.2,-4.95,5.8,.07,.35,materials.orange);
     // catch pad and measuring pillars
     box(0,.15,-9,6,.3,4.3,materials.black);
-    box(0,.32,-9,5.5,.08,3.8,materials.red);
+    addFloorCollider(box(0,.32,-9,5.5,.08,3.8,materials.red));
     for(let i=0;i<9;i++){box(-3.15,i*2,-8.7,.08,.06,.9,materials.orange);}
     sign('16m DROP TEST',0,5.3,-16.5,'#ffba72',.6);
-    for(let j=0;j<8;j++) box(7,.32+j*.73,-7+j*1.4,3,.5,1.45,materials.steel);
+    for(let j=0;j<8;j++) addFloorCollider(box(7,.32+j*.73,-7+j*1.4,3,.5,1.45,materials.steel));
   } else if(mode==='zombies'){
     sign('CONTAINMENT',0,5.2,-16.5,'#ff8b76',.62);
     for(let i=0;i<5;i++){
@@ -250,7 +258,7 @@ function buildArena(mode){
   } else {
     sign('BIOMECHANICS',0,5.2,-16.5,'#9df2e9',.58);
     box(0,.075,-6,3,.14,3,materials.black);
-    box(0,.16,-6,2.7,.05,2.7,materials.steel);
+    addFloorCollider(box(0,.16,-6,2.7,.05,2.7,materials.steel));
     for(let x of [-1.7,1.7])for(let z of [-7.8,-4.2]){
       box(x,1.35,z,.13,2.55,.13,materials.steel);
     }
@@ -280,7 +288,7 @@ function makeDummy(x,z,y=0,isEnemy=false){
   const d={points:[],prev:[],constraints:[],parts:[],life:100,alive:true,physics:false,
     enemy:isEnemy,base:V(x,y,z),phase:Math.random()*6.28,hitCount:0,deathAt:0,
     blood:100,bleed:0,organs:{brain:100,heart:100,lungs:100,liver:100},
-    fractures:0,injuries:[],maxHeight:y+1.9,fallRegistered:false,poolTimer:0};
+    fractures:0,injuries:[],maxHeight:y+1.9,fallRegistered:false,poolTimer:0,wounds:[],reaction:0,reactionTime:0};
   d.walkDistance=0;d.facing=0;d.hasWalk=false;d.skin=isEnemy?materials.deadSkin:(Math.random()<.55?materials.skin:materials.skin2);
   d.points=jointTemplate.map(([px,py,pz])=>V(x+px,y+py,z+pz));
   d.prev=d.points.map(p=>p.clone());
@@ -380,6 +388,11 @@ function pose(d){
     m.visible=xrOn;
   }
   for(const [i,s] of d.joints)s.position.copy(pts[i]);
+  for(const wound of d.wounds){
+    wound.mesh.position.copy(pts[wound.index]);
+    wound.mesh.position.z+=wound.front;
+    wound.mesh.rotation.z=wound.twist;
+  }
 }
 function animateLiving(d,time){
   if(d.physics)return;
@@ -429,6 +442,13 @@ function simulate(d,dt){
       const floor=floorAt(p.x,p.z)+.075;
       if(p.y<floor){p.y=floor;d.prev[d.points.indexOf(p)].x=p.x+(d.prev[d.points.indexOf(p)].x-p.x)*.7;
         d.prev[d.points.indexOf(p)].z=p.z+(d.prev[d.points.indexOf(p)].z-p.z)*.7;}
+      for(const c of colliders){
+        if(Math.abs(p.x-c.x)<c.halfX&&Math.abs(p.z-c.z)<c.halfZ&&p.y<c.top+.08&&p.y>c.top-.5){
+          p.y=c.top+.08;
+          const prev=d.prev[d.points.indexOf(p)];
+          if(prev.y<p.y)prev.y=p.y;
+        }
+      }
       p.x=THREE.MathUtils.clamp(p.x,-14.3,14.3);p.z=THREE.MathUtils.clamp(p.z,-16.3,14.7);
     }
   }
@@ -450,9 +470,18 @@ function zoneOf(index){
   if(index<=9)return 'ARTI SUPERIORI';
   return 'ARTI INFERIORI';
 }
+function createWound(d,index,strength=30){
+  if(d.wounds.length>=15)return;
+  const isCloth=index!==0&&(index<5||index>9);
+  const mat=isCloth?materials.woundedCloth:materials.wound;
+  const mark=mesh(new THREE.CircleGeometry(.04+Math.min(45,strength)*.0016,9),mat,bodies);
+  d.wounds.push({index,mesh:mark,front:index===0?.203:index<=3?.24:.11,twist:Math.random()*.3-.15});
+}
 function addTrauma(d,amount,index,kind='IMPATTO'){
   amount=Math.max(0,amount);if(amount===0)return;
   const zone=zoneOf(index);
+  if(kind==='FERITA'||kind==='ESPLOSIONE')createWound(d,index,amount);
+  d.reaction=Math.min(1,d.reaction+amount*.01);d.reactionTime=performance.now();
   const organ=zone==='TESTA'?'brain':zone==='TORACE'?(index===1?'lungs':'heart'):zone==='ADDOME'?'liver':null;
   let severity=amount;
   if(organ){
