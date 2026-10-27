@@ -410,6 +410,8 @@ function animateLiving(d,time){
   const knock=Math.sin(Math.min(1,since/.26)*Math.PI)*flinch;
   const legInjury=d.limp||0;
   const injuredLeg=d.hitIndex>=13?1:-1;
+  const hitLocalX=d.hitDirection.x*cs-d.hitDirection.z*sn;
+  const hitLocalZ=d.hitDirection.x*sn+d.hitDirection.z*cs;
   for(let i=0;i<jointTemplate.length;i++){
     let [x,y,z]=jointTemplate[i];
     if(i===0){x+=.009*sway;z+=.014*sway;}
@@ -430,9 +432,11 @@ function animateLiving(d,time){
     }
     if(i===10||i===13)y+=bounce;
     // No ballistic teleport: all flinching is constrained to centimetres.
-    if(i<=3){z-=knock*.075;x+=knock*.018*(d.hitIndex<4?1:-1);}
-    else if(i<=9){z-=knock*.07;}
-    if(i===0){z-=knock*.055;y-=knock*.026;}
+    if(i<=3){z+=knock*.085*hitLocalZ;x+=knock*.048*hitLocalX;}
+    else if(i<=9){z+=knock*.065*hitLocalZ;x+=knock*.025*hitLocalX;}
+    // Reflex withdrawal of the struck arm, while keeping the feet planted.
+    if(d.hitIndex>=4&&d.hitIndex<=9&&i===d.hitIndex){y+=knock*.05;z-=knock*.06;}
+    if(i===0){z+=knock*.027*hitLocalZ;y-=knock*.018;}
     d.points[i].set(d.base.x+x*cs+z*sn,d.base.y+y+bounce*(i===0?.4:0),d.base.z-x*sn+z*cs);
     d.prev[i].copy(d.points[i]);
   }
@@ -474,9 +478,13 @@ function simulate(d,dt){
 }
 // A gunshot is not an explosion: keep projectile momentum small relative to body mass.
 // Incoming bullet transfers pain and local recoil; it never enables full ragdoll by itself.
-function impulse(d,index,strength,dir){
+function impulse(d,index,strength,dir,isExplosion=false){
   if(!d.physics)return;
-  const displacement=THREE.MathUtils.clamp(strength*.00065,0,.12);
+  // A bullet's momentum is negligible relative to an adult's body mass.
+  // A blast wave is different: it can impart enough momentum to knock somebody over.
+  const displacement=isExplosion
+    ? THREE.MathUtils.clamp(strength*.00065,0,.12)
+    : THREE.MathUtils.clamp(strength*.000018,0,.003);
   const center=d.points[3];
   for(let k=0;k<d.points.length;k++){
     const near=Math.max(.22,1-center.distanceTo(d.points[k])/2.4);
@@ -765,7 +773,7 @@ function hitPhysics(d,point,index,dir,damage,force,bleedScale,kind){
   if(d.physics){
     // When incapacitation activates ragdoll, start from the current pose.
     if(!beforePhysics)d.prev.forEach((prev,i)=>prev.copy(d.points[i]));
-    impulse(d,index,kind==='ESPLOSIONE'?Math.min(force,190):Math.min(force,125),dir);
+    impulse(d,index,kind==='ESPLOSIONE'?Math.min(force,190):Math.min(force,125),dir,kind==='ESPLOSIONE');
   }else{
     registerHitReaction(d,index,dir,damage);
   }
