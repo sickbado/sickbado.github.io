@@ -598,6 +598,11 @@ function spawnForMode(){
   updateHud();
 }
 function spawnWave(){
+  // Remove previous fallen wave before spawning the next one. Otherwise
+  // dozens of inactive articulated characters accumulate in Safari memory.
+  if(dummies.length && dummies.every(d=>!d.alive || !d.enemy)){
+    bodies.clear();dummies.length=0;held=null;
+  }
   wave++;nextWaveAt=0;
   const count=Math.min(2+wave,7);
   for(let i=0;i<count;i++){
@@ -723,6 +728,33 @@ function changeTool(name){
   refreshAmmo();
 }
 function currentRay(){camera.getWorldDirection(tempA);ray.set(camera.position,tempA);return ray}
+function worldImpactPoint(direction,range=62){
+ const from=camera.position, candidates=[];
+ function planeAt(axis,coordinate){
+  const value=direction[axis];if(Math.abs(value)<.00001)return;
+  const t=(coordinate-from[axis])/value;
+  if(t>.2 && t<range){
+    const hit=from.clone().addScaledVector(direction,t);
+    if(Math.abs(hit.x)<=14.75&&hit.z>=-16.7&&hit.z<=15.4&&hit.y>-.02&&hit.y<=8.2)candidates.push({point:hit,distance:t});
+  }
+ }
+ planeAt('x',-14.74);planeAt('x',14.74);
+ planeAt('z',-16.74);planeAt('z',15.35);
+ planeAt('y',.012);
+ if(mode!=='tower')planeAt('y',8.01);
+ for(const c of colliders){
+  const half=Math.max(c.halfX,c.halfZ);
+  if(Math.abs(direction.y)>.001){
+   const t=(c.top-from.y)/direction.y;
+   if(t>.2&&t<range){
+    const pt=from.clone().addScaledVector(direction,t);
+    if(Math.abs(pt.x-c.x)<c.halfX&&Math.abs(pt.z-c.z)<c.halfZ)candidates.push({point:pt,distance:t});
+   }
+  }
+ }
+ candidates.sort((a,b)=>a.distance-b.distance);
+ return candidates[0]?.point||from.clone().addScaledVector(direction,range);
+}
 function rayTarget(maxDist=65,aimDir=null){
   const r=currentRay();if(aimDir)r.direction.copy(aimDir);
   let best=null,dist=Infinity;
@@ -872,7 +904,7 @@ function action(){
     const spread=weapon.spread*(aimBlend>.65?.55:1);
     const dir=shotRay({x:(Math.random()-.5)*spread*2,y:(Math.random()-.5)*spread*2});
     const hit=rayTarget(80,dir);
-    const point=hit?hit.point.clone():camera.position.clone().addScaledVector(dir,56);
+    const point=hit?hit.point.clone():worldImpactPoint(dir,56);
     if(i===0||tool==='shotgun'&&i%2===0)tracer(start,point,tool);
     if(i===0)premium.onShot(tool,hit,point,dir);
     if(hit){
@@ -1004,8 +1036,18 @@ function movePlayer(dt){
   const targetFov=aiming?(tool==='sniper'?34:56):75;
   if(Math.abs(camera.fov-targetFov)>.03){camera.fov=THREE.MathUtils.damp(camera.fov,targetFov,11,dt);camera.updateProjectionMatrix();}
   const speed=mode==='tower'?4:5.7,step=speed*(aiming?.75:1)*dt/mag;
-  player.x+=(-Math.sin(yaw)*forward+Math.cos(yaw)*right)*step;
-  player.z+=(-Math.cos(yaw)*forward-Math.sin(yaw)*right)*step;
+  let nextX=player.x+(-Math.sin(yaw)*forward+Math.cos(yaw)*right)*step;
+  let nextZ=player.z+(-Math.cos(yaw)*forward-Math.sin(yaw)*right)*step;
+  // Soft, axis-wise collisions keep the camera out of lab benches and stands.
+  const playerRadius=.22;
+  for(const c of colliders){
+    if(c.top<.70||c.top>2.5)continue;
+    if(Math.abs(nextX-c.x)<c.halfX+playerRadius && Math.abs(player.z-c.z)<c.halfZ+playerRadius)
+      nextX=player.x;
+    if(Math.abs(nextZ-c.z)<c.halfZ+playerRadius && Math.abs(nextX-c.x)<c.halfX+playerRadius)
+      nextZ=player.z;
+  }
+  player.x=nextX;player.z=nextZ;
   player.x=THREE.MathUtils.clamp(player.x,-13,13);
   player.z=THREE.MathUtils.clamp(player.z,mode==='tower'?-1.5:-15,13);
   camera.position.set(player.x,player.y+Math.sin(performance.now()*.011)*.018*Math.min(1,Math.hypot(forward,right)),player.z);
