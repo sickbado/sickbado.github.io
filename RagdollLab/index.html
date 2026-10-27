@@ -2,7 +2,7 @@
 <html lang="it"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#090f17"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Ragdoll Lab"><meta name="description" content="Ragdoll Lab 0.3: sandbox fisico 3D con animazioni, armi e diagnostica medica su iPhone.">
+<meta name="apple-mobile-web-app-title" content="Ragdoll Lab"><meta name="description" content="Ragdoll Lab 0.5: sandbox fisico 3D con animazioni, armi e diagnostica medica su iPhone.">
 <link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>RAGDOLL LAB | Injury Simulation</title>
 <style>
@@ -95,7 +95,7 @@ h1 em{color:#71eee1;font-style:normal}
 </style></head><body>
 <canvas id="game"></canvas>
 <div id="overlay">
-  <div id="top"><div><div class="brand">RAGDOLL LAB <span style="color:#6c8493;font-weight:600">/ MOBILE</span></div><span class="tiny">RESEARCH FACILITY · PROTOTIPO 0.3</span></div><div class="vitals">BERSAGLIO <b id="targetHealth">100%</b><br><span id="targetState">INTEGRITÀ STRUTTURALE</span></div></div>
+  <div id="top"><div><div class="brand">RAGDOLL LAB <span style="color:#6c8493;font-weight:600">/ MOBILE</span></div><span class="tiny">RESEARCH FACILITY · PROTOTIPO 0.5</span></div><div class="vitals">BERSAGLIO <b id="targetHealth">100%</b><br><span id="targetState">INTEGRITÀ STRUTTURALE</span></div></div>
   <div id="health">OPERATORE <span id="mode">SANDBOX</span><div id="healthbar"><div id="healthFill"></div></div></div>
   <div id="upperBtns"><button class="smallBtn" id="medButton">♡ ANATOMIA</button><button class="smallBtn" id="xrButton">◎ RX</button><button class="smallBtn" id="reset">↻ RIPRISTINA</button><button class="smallBtn" id="menu">☰ MENU</button></div>
 
@@ -122,12 +122,12 @@ h1 em{color:#71eee1;font-style:normal}
     <button class="tool" data-tool="physics"><span>◇</span>FISICA</button>
     <button class="tool" data-tool="drop"><span>↓</span>CADUTA</button>
   </div>
-  <div id="desktopHint">WASD muovi · Trascina per guardare · Clic per agire · 1–5 strumenti · R ripristina</div>
+  <div id="desktopHint">WASD muovi · Trascina per guardare · Clic per agire · 1–8 strumenti · R ripristina</div>
 </div>
 <div id="home"><div class="homeCard">
   <div class="code">UNITÀ DI SIMULAZIONE / RL-01</div>
   <h1>RAGDOLL<br><em>LAB.</em></h1>
-  <p>Un laboratorio 3D più realistico: personaggi animati, reazioni ragdoll, armi dettagliate, lesioni fisiche e diagnostica. Progettato per giocare direttamente su iPhone, senza PC o streaming.</p>
+  <p>Un laboratorio 3D in evoluzione: personaggi animati, impatti più realistici senza voli a ogni colpo, armi dettagliate e diagnostica. Progettato per giocare direttamente su iPhone, senza PC o streaming.</p>
   <div class="selecttitle">SELEZIONA AMBIENTE</div>
   <div class="modes">
     <button class="modebtn active" data-mode="lab"><span class="emoji">🧪</span><strong>IL LABORATORIO</strong><small>Sandbox · manichini e attrezzature</small></button>
