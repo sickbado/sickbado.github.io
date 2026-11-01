@@ -41,7 +41,7 @@ const goalLocation=g=>office(officeForGoal(g))?.name||"Ufficio non trovato";
 const entryPerson=e=>e.personId?person(e.personId)?.name||"Collaboratore rimosso":scopeOf(db.goals.find(g=>g.id===e.goalId))==="office"?"Non attribuito":goalLabel(db.goals.find(g=>g.id===e.goalId));
 const officeEntry=(g,d,pid)=>db.entries.find(e=>e.goalId===g.id&&e.date===d&&(e.personId||"")===(pid||""));
 const kpiKey=g=>JSON.stringify([g.name.trim().toLocaleLowerCase("it"),g.category,g.unit,g.mode]);
-const kpiOptions=()=>{const map=new Map();for(const g of db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office")){const k=kpiKey(g);if(!map.has(k))map.set(k,{key:k,label:g.name+" · "+g.unit,name:g.name,unit:g.unit});}return [...map.values()].sort((a,b)=>a.label.localeCompare(b.label,"it"));};
+const kpiOptions=()=>{const map=new Map();for(const g of db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office"&&g.mode!=="latest")){const k=kpiKey(g);if(!map.has(k))map.set(k,{key:k,label:g.name+" · "+g.unit,name:g.name,unit:g.unit});}return [...map.values()].sort((a,b)=>a.label.localeCompare(b.label,"it"));};
 const officeContribution=(g,pid)=>db.entries.filter(e=>e.goalId===g.id&&(e.personId||"")===(pid||"")&&e.date.startsWith(g.month)).reduce((a,e)=>a+Number(e.value||0),0);
 const leaderData=(selected,filterOffice="all")=>{
  const gs=db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office"&&kpiKey(g)===selected&&(filterOffice==="all"||g.officeId===filterOffice));
@@ -221,8 +221,32 @@ function modGoal(gid,preselect,preferredScope,preferredOffice){
 function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function csv(rows){return "\uFEFF"+rows.map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(";")).join("\r\n");}
 function backup(){download("Manicomio_backup_"+day()+".json",JSON.stringify(db,null,2),"application/json");}
-function csvGoals(){const rows=[["Mese","Ufficio","Collaboratore","Ruolo","Obiettivo","Categoria","Target","Unità","Consuntivo","Avanzamento %"]];db.goals.filter(g=>g.month===ui.month).forEach(g=>{const p=person(g.personId);rows.push([g.month,office(p?.officeId)?.name,p?.name,p?.role,g.name,g.category,g.target,g.unit,val(g),Math.round(pct(g))]);});download("Manicomio_obiettivi_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");}
-function csvEntries(){const rows=[["Data","Ufficio","Collaboratore","Obiettivo","Categoria","Valore","Unità"]];db.entries.filter(e=>e.date.startsWith(ui.month)).forEach(e=>{const g=db.goals.find(g=>g.id===e.goalId),p=g&&person(g.personId);rows.push([e.date,office(p?.officeId)?.name,p?.name,g?.name,g?.category,e.value,g?.unit]);});download("Manicomio_rilevazioni_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");}
+function csvGoals(){
+ const rows=[["Mese","Ambito","Ufficio","Collaboratore","Ruolo","Obiettivo","Categoria","Target","Unità","Consuntivo","Avanzamento %"]];
+ db.goals.filter(g=>g.month===ui.month).forEach(g=>{
+   const p=scopeOf(g)==="person"?person(g.personId):null;
+   rows.push([g.month,scopeOf(g)==="office"?"Ufficio":"Individuale",goalLocation(g),p?.name||"",p?.role||"",g.name,g.category,g.target,g.unit,val(g),Math.round(pct(g))]);
+ });
+ download("Manicomio_obiettivi_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");
+}
+function csvEntries(){
+ const rows=[["Data","Ambito","Ufficio","Collaboratore / Contributore","Ruolo","Obiettivo","Categoria","Valore","Unità"]];
+ db.entries.filter(e=>e.date.startsWith(ui.month)).forEach(e=>{
+   const g=db.goals.find(g=>g.id===e.goalId);
+   if(!g)return;
+   const p=scopeOf(g)==="office"?person(e.personId):person(g.personId);
+   rows.push([e.date,scopeOf(g)==="office"?"Ufficio":"Individuale",goalLocation(g),p?.name||"Non attribuito",p?.role||"",g.name,g.category,e.value,g.unit]);
+ });
+ download("Manicomio_rilevazioni_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");
+}
+function csvContributions(){
+ const opts=kpiOptions(), selected=opts.some(o=>o.key===ui.kpi)?ui.kpi:opts[0]?.key;
+ if(!selected){toast("Crea prima un obiettivo di ufficio di tipo Somma");return;}
+ const data=leaderData(selected,ui.office),label=opts.find(x=>x.key===selected)?.name||"Indicatore";
+ const rows=[["Posizione","Mese","Indicatore","Ufficio","Collaboratore","Ruolo","Contributo","Unità"]];
+ data.members.forEach((p,i)=>rows.push([i+1,ui.month,label,office(p.officeId)?.name,p.name,p.role,p.result,opts.find(x=>x.key===selected)?.unit||""]));
+ download("Manicomio_classifica_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");
+}
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav){ui.page=nav.dataset.nav;if(ui.page==="daily"&&ui.office==="all")ui.office=db.offices[0].id;render();window.scrollTo(0,0);return;}
 const b=e.target.closest("[data-action]");if(!b)return;const action=b.dataset.action;const k=b.dataset.id;
 if(action==="dismiss"){if(b.classList.contains("shade")&&e.target!==b)return;closeModal();return;}
@@ -243,6 +267,7 @@ if(action==="deleteEntry"){if(confirm("Eliminare questa rilevazione?")){db.entri
 if(action==="backup")backup();
 if(action==="csvGoals")csvGoals();
 if(action==="csvEntries")csvEntries();
+if(action==="csvContributions")csvContributions();
 if(action==="reset"){if(confirm("ATTENZIONE: svuotare tutto l'archivio locale? Assicurati di aver esportato un backup.")&&confirm("Confermi la cancellazione definitiva?")){db=blank();save();ui.office="all";change("dashboard");}}
 if(action==="copyGoals"){const pm=prevMonth(ui.month),src=db.goals.filter(g=>g.month===pm),keyOf=g=>[scopeOf(g),scopeOf(g)==="office"?g.officeId:g.personId,g.name.toLocaleLowerCase("it"),g.category].join("|"),existing=new Set(db.goals.filter(g=>g.month===ui.month).map(keyOf));let n=0;for(const g of src){const key=keyOf(g);if(existing.has(key))continue;db.goals.push({...g,id:id(),month:ui.month});existing.add(key);n++;}save();render();toast(n?n+" obiettivi copiati":"Nessun nuovo obiettivo da copiare");}
 });
