@@ -13,7 +13,8 @@ function normalizeCatalog(data){
   for(const [key,items,field] of [["roles",data.people,"role"],["categories",data.goals,"category"],["units",data.goals,"unit"]]){
     for(const item of items||[])if(typeof item[field]==="string"&&item[field].trim()&&!data.catalogs[key].includes(item[field]))data.catalogs[key].push(item[field]);
   }
-  data.version=3;
+  if(!Array.isArray(data.reportImports))data.reportImports=[];
+  data.version=4;
 }
 const pad=n=>String(n).padStart(2,"0");
 const day=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -24,10 +25,10 @@ const shortDate=x=>x?x.split("-").reverse().join("/"):"";
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>Number(n||0).toLocaleString("it-IT",{maximumFractionDigits:1});
 const id=()=>((globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
-const blank=()=>({version:3,offices:Array.from({length:13},(_,i)=>({id:"u"+i,name:i?"Ufficio di prossimità "+pad(i):"Ufficio principale"})),people:[],goals:[],entries:[],catalogs:{roles:[...defaults.roles],categories:[...defaults.categories],units:[...defaults.units]}});
+const blank=()=>({version:4,reportImports:[],offices:Array.from({length:13},(_,i)=>({id:"u"+i,name:i?"Ufficio di prossimità "+pad(i):"Ufficio principale"})),people:[],goals:[],entries:[],catalogs:{roles:[...defaults.roles],categories:[...defaults.categories],units:[...defaults.units]}});
 let db;try{db=JSON.parse(localStorage.getItem(KEY));if(!db||!Array.isArray(db.offices)||!Array.isArray(db.people)||!Array.isArray(db.goals)||!Array.isArray(db.entries))db=blank();}catch{db=blank();}
 normalizeCatalog(db);
-let ui={page:"dashboard",month:month(),office:"all",date:day(),filter:"all",kpi:""};
+let ui={page:"dashboard",month:month(),office:"all",date:day(),filter:"all",kpi:"",reportOffice:"",reportPreview:null};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch{alert("Memoria del dispositivo piena: esporta subito un backup JSON.");return false;}};
 const $=sel=>document.querySelector(sel);
 const office=o=>db.offices.find(x=>x.id===o);
@@ -104,15 +105,15 @@ function catalogRemove(key,value){
   db.catalogs[key].splice(index,1);
   if(save()){render();toast("Voce eliminata");}
 }
-const icon=(name)=>({dashboard:"▦",offices:"▣",people:"♙",goals:"◎",ranking:"★",daily:"✎",history:"◷",settings:"⚙"})[name]||"•";
-const tabs=[["dashboard","Riepilogo"],["offices","Uffici"],["people","Collaboratori"],["goals","Obiettivi"],["ranking","Classifiche"],["daily","Registro"],["history","Storico"],["settings","Impostazioni"]];
+const icon=(name)=>({dashboard:"▦",offices:"▣",people:"♙",goals:"◎",ranking:"★",daily:"✎",reports:"▤",history:"◷",settings:"⚙"})[name]||"•";
+const tabs=[["dashboard","Riepilogo"],["offices","Uffici"],["people","Collaboratori"],["goals","Obiettivi"],["ranking","Classifiche"],["daily","Registro"],["reports","Report"],["history","Storico"],["settings","Impostazioni"]];
 function toast(t){const x=$("#toast");if(x){x.textContent=t;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),2600);}}
 function change(page){ui.page=page;render();window.scrollTo(0,0);}
 function footer(){return `<div class="foot">Manicomio • archivio locale su questo dispositivo • nessuna sincronizzazione cloud</div>`;}
 function top(){return `<header class="top"><div><div class="eyebrow">GESTIONE DIREZIONALE • 13 UFFICI</div><h1>${esc(tabs.find(t=>t[0]===ui.page)?.[1]||"Manicomio")}</h1><p>${esc(dateTitle(ui.month))} · ${db.people.length} collaboratori censiti</p></div><label class="month"><span>Mese</span><input type="month" id="month" value="${esc(ui.month)}"></label></header>`;}
 function nav(){return tabs.map(([p,t])=>`<button data-nav="${p}" class="${ui.page===p?"active":""}"><span>${icon(p)}</span><b>${t}</b></button>`).join("");}
 function render(){document.title="Manicomio · Direzione";$("#app").innerHTML=`<div class="layout"><aside class="side"><div class="brand"><div class="brandmark">M</div><div><strong>Manicomio</strong><small>DIREZIONE RETE</small></div></div><div class="menulabel">LA TUA RETE</div><nav class="side-nav">${nav()}</nav><div class="side-bottom"><div class="side-feature">13 sedi, una sola regia.<br><span>Obiettivi commerciali e gestionali sempre sotto controllo.</span></div><span>Accesso locale · solo direttore</span></div></aside><main class="main">${top()}${page()}${footer()}</main></div><nav class="bottom-nav">${nav()}</nav>`;}
-function page(){switch(ui.page){case"offices":return officesPage();case"people":return peoplePage();case"goals":return goalsPage();case"daily":return dailyPage();case"ranking":return rankingPage();case"history":return historyPage();case"settings":return settingsPage();default:return dashboardPage();}}
+function page(){switch(ui.page){case"offices":return officesPage();case"people":return peoplePage();case"goals":return goalsPage();case"daily":return dailyPage();case"ranking":return rankingPage();case"reports":return reportsPage();case"history":return historyPage();case"settings":return settingsPage();default:return dashboardPage();}}
 function dashboardPage(){
  const gs=db.goals.filter(g=>g.month===ui.month), q=expected(ui.month);
  const peopleWithGoals=new Set(gs.filter(g=>scopeOf(g)==="person").map(g=>g.personId)).size;
@@ -189,6 +190,85 @@ function rankingPage(){
  </section><section class="panel"><div class="panel-head"><h3>Uffici a confronto</h3><span class="subtle">Stesso indicatore</span></div>
  ${data.gs.slice().sort((a,b)=>pct(b)-pct(a)).map(g=>`<button class="office-line" data-action="jumpOffice" data-id="${esc(g.officeId)}"><div><b>${esc(goalLocation(g))}</b><small>${pretty(g,val(g))} / ${pretty(g,g.target)}</small></div>${pBar(pct(g))}<strong>${Math.round(pct(g))}%</strong></button>`).join("")}</section></div>
  <p class="note">Le classifiche confrontano soltanto lo stesso indicatore (nome, categoria, unità e modalità di calcolo). Le cifre di natura diversa non vengono sommate. I collaboratori senza risultati compaiono con zero. Le prestazioni vanno lette alla luce di presenze, incarichi e opportunità effettive.</p>`}`;
+}
+const REPORT_HEADERS=["Versione","Codice ufficio","Ufficio","Data","Codice obiettivo","Ambito","Obiettivo","Categoria","Unità","Codice collaboratore","Collaboratore","Risultato","Note"];
+const REPORT_VERSION="MANICOMIO-REPORT-1";
+function reportOffice(){return db.offices.find(o=>o.id===ui.reportOffice)||(ui.office!=="all"?office(ui.office):null)||db.offices[0];}
+
+function reportDate(d){const [y,m,dd]=d.split("-");return dd+"/"+m+"/"+y;}
+
+function reportDateParse(x){
+ const s=String(x||"").trim();
+ if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+ if(/^\d{1,2}[./-]\d{1,2}[./-]\d{4}$/.test(s)){
+  const [dd,mm,yy]=s.split(/[./-]/).map(Number),t=`${yy}-${pad(mm)}-${pad(dd)}`;
+  const dt=new Date(t+"T12:00:00");
+  return Number.isFinite(dt.getTime())&&dt.toISOString().slice(0,10)===t?t:null;
+ }
+ return null;
+}
+
+function csvSafeCell(x){
+ let s=String(x??"");
+ if(/^[\s]*[=+@]/.test(s))s="'"+s;
+ return '"'+s.replaceAll('"','""')+'"';
+}
+
+function reportCsv(rows){return "\uFEFFsep=;\r\n"+rows.map(row=>row.map(csvSafeCell).join(";")).join("\r\n")+"\r\n";}
+
+function csvParse(source){
+ const src=String(source||"").replace(/^\uFEFF/,"").replace(/^sep=;\r?\n/i,"");
+ let rows=[],row=[],field="",quoted=false;
+ for(let i=0;i<src.length;i++){
+  const ch=src[i];
+  if(quoted){if(ch==='"'&&src[i+1]==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;}
+  else if(ch==='"'&&field==="")quoted=true;
+  else if(ch===';'){row.push(field);field="";}
+  else if(ch==='\r'||ch==='\n'){
+   if(ch==='\r'&&src[i+1]==='\n')i++;
+   row.push(field);field="";
+   if(row.some(x=>x.trim()))rows.push(row);
+   row=[];
+  }else field+=ch;
+ }
+ if(quoted)throw Error("Virgolette CSV non chiuse.");
+ if(field!==""||row.length){row.push(field);if(row.some(x=>x.trim()))rows.push(row);}
+ return rows;
+}
+
+function reportGoals(oid){
+ return db.goals.filter(g=>g.month===ui.month&&officeForGoal(g)===oid).sort((a,b)=>{
+  const a0=scopeOf(a)==="office"?0:1,b0=scopeOf(b)==="office"?0:1;
+  return a0-b0||a.name.localeCompare(b.name,"it");
+ });
+}
+
+function numberParse(x){
+ const s=String(x).trim().replace(/\s/g,"");
+ if(!s)return null;
+ if(!/^\d+(?:[.,]\d+)?$/.test(s))return NaN;
+ return Number(s.replace(",","."));
+}
+
+function generateReport(which){
+ const o=reportOffice();if(!o)return;
+ const gs=reportGoals(o.id);
+ if(!gs.length){alert("Non ci sono obiettivi per "+o.name+" nel mese "+dateTitle(ui.month)+". Assegna prima almeno un obiettivo.");return;}
+ const days=which==="day"?[ui.date.slice(0,7)===ui.month?ui.date:ui.month+"-01"]:Array.from({length:daysIn(ui.month)},(_,i)=>ui.month+"-"+pad(i+1));
+ const people=db.people.filter(p=>p.officeId===o.id).sort((a,b)=>a.name.localeCompare(b.name,"it"));
+ const rows=[REPORT_HEADERS];
+ for(const d of days)for(const g of gs){
+  const members=scopeOf(g)==="person"?[person(g.personId)]:g.mode==="latest"?[null]:[...people,null];
+  for(const p of members){
+   if(scopeOf(g)==="person"&&!p)continue;
+   const pid=scopeOf(g)==="office"?p?.id||"":g.personId;
+   const e=db.entries.find(e=>e.goalId===g.id&&e.date===d&&(scopeOf(g)==="person"||(e.personId||"")===pid));
+   rows.push([REPORT_VERSION,o.id,o.name,reportDate(d),g.id,scopeOf(g)==="office"?"Ufficio":"Individuale",g.name,g.category,g.unit,pid,p?.name||(scopeOf(g)==="office"?"Non attribuito":""),e?String(Number(e.value)).replace(".",","):"",e?.note||""]);
+  }
+ }
+ const name=o.name.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_").slice(0,36)||"Ufficio";
+ download(`Manicomio_Report_${name}_${which==="day"?ui.date:ui.month}.csv`,reportCsv(rows),"text/csv;charset=utf-8");
+ toast(rows.length-1+" righe esportate per "+o.name);
 }
 function catalogSection(){
   const list=(key)=>`<div class="catalog-group"><div class="catalog-group-top"><div><h3>${esc(catalogLabels[key])}</h3><p>${key==="roles"?"Modifica i ruoli disponibili nelle schede dei collaboratori.":key==="categories"?"Personalizza le categorie associate agli obiettivi.":"Aggiungi o modifica le unità usate nei target."}</p></div><button type="button" class="secondary" data-action="catalogAdd" data-cat="${key}">+ Aggiungi</button></div><div class="catalog-items">${db.catalogs[key].map(value=>`<div class="catalog-row"><span><b>${esc(value)}</b><small>${catalogUsage(key,value)} ${key==="roles"?"collaboratori":"obiettivi"} collegati</small></span><div class="catalog-actions"><button class="icon-button" type="button" title="Rinomina voce" aria-label="Rinomina ${esc(value)}" data-action="catalogRename" data-cat="${key}" data-value="${esc(value)}">✎</button><button class="icon-button" type="button" title="Elimina voce" aria-label="Elimina ${esc(value)}" data-action="catalogRemove" data-cat="${key}" data-value="${esc(value)}">×</button></div></div>`).join("")}</div></div>`;
