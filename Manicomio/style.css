@@ -34,3 +34,21 @@
 .catalog-quick{background:transparent;align-self:flex-start;padding:0;color:#0756a4;font-size:11px;font-weight:800;text-align:left;min-height:30px}
 .catalog-quick:hover{text-decoration:underline}
 @media(max-width:420px){.catalog-group-top{align-items:flex-start;flex-wrap:wrap}.catalog-group-top button{width:100%}}
+
+/* Monitoraggio obiettivi di ufficio e GeoPostale */
+.leader-row{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid #edf2f8}
+.leader-row:last-child{border:0}
+.leader-num{display:grid;place-items:center;flex:0 0 35px;height:35px;border-radius:12px;background:#fff3c9;color:#805900;font-weight:900;font-size:12px}
+.leader-row:nth-child(2) .leader-num{background:#e4f0ff;color:#003f8d}
+.leader-name{flex:1;min-width:0}
+.leader-name b{display:block;overflow-wrap:anywhere;font-size:12px}
+.leader-name small{display:block;font-size:10px;color:var(--grey);margin-top:4px;line-height:1.5}
+.leader-score{text-align:right;min-width:65px}
+.leader-score strong{font-size:16px;color:var(--blue);font-variant-numeric:tabular-nums}
+.leader-score small{display:block;font-size:9px;color:var(--grey);margin-top:4px}
+.catalog-add-container{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.catalog-add-inline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:100%}
+.catalog-add-inline[hidden]{display:none!important}
+.catalog-add-inline input{flex:1 1 120px;width:145px;min-width:0}
+.catalog-add-inline .secondary{font-size:11px;padding:7px 11px}
+@media(max-width:760px){.action-row{display:flex;flex-wrap:wrap}.section-title .action-row{width:100%}.section-title .action-row>button{flex:1;white-space:nowrap}.bottom-nav{justify-content:flex-start}.bottom-nav button{flex:1 0 49px;min-width:49px}.bottom-nav button b{font-size:8px}.leader-row{gap:8px}.filters.two{gap:10px}}
