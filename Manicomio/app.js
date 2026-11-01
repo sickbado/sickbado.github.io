@@ -66,33 +66,34 @@ const roleOpts=selected=>catalogOpts("roles",selected);
 const catalogValue=(value)=>String(value??"").trim().replace(/\s+/g," ");
 const catalogDuplicate=(key,value,except)=>db.catalogs[key].some(x=>x!==except&&x.toLocaleLowerCase("it")===value.toLocaleLowerCase("it"));
 const catalogUsage=(key,value)=>key==="roles"?db.people.filter(p=>p.role===value).length:db.goals.filter(g=>g[key==="categories"?"category":"unit"]===value).length;
-function catalogAdd(key,select){
-  if(!defaults[key])return;
-  const entered=prompt("Nuova voce per "+catalogLabels[key]+":");
-  if(entered===null)return;
-  const value=catalogValue(entered);
-  if(!value||value.length>80){alert("Inserisci una voce da 1 a 80 caratteri.");return;}
-  if(catalogDuplicate(key,value)){alert("Questa voce è già presente.");return;}
-  db.catalogs[key].push(value);
-  if(!save()){db.catalogs[key].pop();return;}
-  if(select){const option=document.createElement("option");option.value=value;option.textContent=value;select.add(option);select.value=value;}
-  else render();
-  toast("Voce aggiunta: "+value);
+function catalogAdd(key){
+ if(!defaults[key])return;
+ showModal("Aggiungi · "+catalogLabels[key],`<input type="hidden" name="catalogKey" value="${esc(key)}">${input("Nuova voce","name","","text",'maxlength="80"')}`,"catalog","");
 }
 function catalogRename(key,old){
-  const entered=prompt("Modifica voce:",old);
-  if(entered===null)return;
-  const value=catalogValue(entered);
-  if(!value||value.length>80){alert("Inserisci una voce da 1 a 80 caratteri.");return;}
-  if(value===old)return;
-  if(catalogDuplicate(key,value,old)){alert("Questa voce è già presente.");return;}
-  const index=db.catalogs[key].indexOf(old);if(index<0)return;
-  db.catalogs[key][index]=value;
-  if(key==="roles")for(const p of db.people)if(p.role===old)p.role=value;
-  if(key==="categories")for(const g of db.goals)if(g.category===old)g.category=value;
-  if(key==="units")for(const g of db.goals)if(g.unit===old)g.unit=value;
-  if(save()){render();toast("Voce modificata e dati aggiornati");}
+ if(!defaults[key]||!db.catalogs[key].includes(old))return;
+ showModal("Rinomina · "+catalogLabels[key],`<input type="hidden" name="catalogKey" value="${esc(key)}">${input("Nome voce","name",old,"text",'maxlength="80"')}`,"catalog",old);
 }
+function catalogQuickAdd(btn){
+ const inline=btn.parentElement.querySelector(".catalog-add-inline");
+ if(!inline)return;
+ inline.hidden=!inline.hidden;
+ if(!inline.hidden)inline.querySelector("input")?.focus();
+}
+function catalogQuickSave(btn){
+ const inline=btn.closest(".catalog-add-inline");
+ const key=inline?.dataset.cat, value=catalogValue(inline?.querySelector("input")?.value);
+ if(!defaults[key]||!value||value.length>80){alert("Inserisci una voce da 1 a 80 caratteri.");return;}
+ if(catalogDuplicate(key,value)){alert("Questa voce è già presente.");return;}
+ db.catalogs[key].push(value);
+ if(!save()){db.catalogs[key].pop();return;}
+ const selector=inline.closest("form")?.elements.namedItem({roles:"role",categories:"category",units:"unit"}[key]);
+ if(selector){const option=document.createElement("option");option.value=value;option.textContent=value;selector.add(option);selector.value=value;}
+ inline.querySelector("input").value="";
+ inline.hidden=true;
+ toast("Nuova voce: "+value);
+}
+const quickCatalog=(key,label)=>`<div class="catalog-add-container"><button class="catalog-quick" type="button" data-action="catalogQuickAdd">+ ${esc(label)}</button><div class="catalog-add-inline" data-cat="${esc(key)}" hidden><input type="text" maxlength="80" placeholder="Nome nuova voce" aria-label="Nome nuova voce"><button class="secondary" type="button" data-action="catalogQuickSave">Aggiungi ✓</button></div></div>`;
 function catalogRemove(key,value){
   const index=db.catalogs[key].indexOf(value);
   if(index<0)return;
@@ -198,8 +199,25 @@ function showModal(title,body,kind,record,submit="Salva"){let root=$("#dialog");
 function closeModal(){$("#dialog").innerHTML="";}
 function input(label,name,val="",type="text",extra=""){return `<label class="field">${esc(label)}<input name="${esc(name)}" type="${esc(type)}" value="${esc(val)}" ${extra} required></label>`;}
 function modOffice(id0){const o=office(id0);showModal("Rinomina ufficio",input("Nome ufficio","name",o?.name,"text",'maxlength="80"'),"office",id0);}
-function modPerson(pid){const p=person(pid);showModal(p?"Modifica collaboratore":"Nuovo collaboratore",`${input("Nome e cognome","name",p?.name,"text",'maxlength="100"')}<label class="field">Ufficio<select name="officeId" required>${selectOpts(db.offices,p?.officeId||db.offices[0]?.id)}</select></label><label class="field">Ruolo<select name="role" required>${roleOpts(p?.role||"Sportello")}</select></label><button class="catalog-quick" type="button" data-action="catalogQuickAdd" data-cat="roles">+ Aggiungi un nuovo ruolo (es. DUP)</button>`,"person",pid);}
-function modGoal(gid,preselect){const g=db.goals.find(x=>x.id===gid);if(!db.people.length){toast("Inserisci prima un collaboratore");change("people");return;}let p=g?.personId||preselect||db.people[0].id;const pers=db.people.map(x=>({id:x.id,name:x.name+" · "+(office(x.officeId)?.name||"")}));showModal(g?"Modifica obiettivo":"Assegna obiettivo",`<label class="field">Collaboratore<select name="personId" required>${selectOpts(pers,p)}</select></label>${input("Nome indicatore","name",g?.name||"","text",'maxlength="100"')}<div class="form-grid"><label class="field">Categoria<select name="category">${catalogOpts("categories",g?.category||db.catalogs.categories[0])}</select><button class="catalog-quick" type="button" data-action="catalogQuickAdd" data-cat="categories">+ Nuova categoria</button></label><label class="field">Unità<select name="unit">${catalogOpts("units",g?.unit||db.catalogs.units[0])}</select><button class="catalog-quick" type="button" data-action="catalogQuickAdd" data-cat="units">+ Nuova unità</button></label></div>${input("Target mensile","target",g?.target??"","number",'min="0.000001" step="any"')}<label class="field">Tipo di misurazione<select name="mode"><option value="sum" ${g?.mode!=="latest"?"selected":""}>Somma dei risultati giornalieri</option><option value="latest" ${g?.mode==="latest"?"selected":""}>Ultimo valore registrato (es. percentuale)</option></select></label><div class="info-line">Mese dell'obiettivo: <b>${esc(dateTitle(ui.month))}</b>. Puoi personalizzare ruoli, categorie e unità dalla schermata Impostazioni.</div>`,"goal",gid);}
+function modPerson(pid){const p=person(pid);showModal(p?"Modifica collaboratore":"Nuovo collaboratore",`${input("Nome e cognome","name",p?.name,"text",'maxlength="100"')}<label class="field">Ufficio<select name="officeId" required>${selectOpts(db.offices,p?.officeId||db.offices[0]?.id)}</select></label><label class="field">Ruolo<select name="role" required>${roleOpts(p?.role||"Sportello")}</select>${quickCatalog("roles","Nuovo ruolo (es. DUP)")}</label>`,"person",pid);}
+function modGoal(gid,preselect,preferredScope,preferredOffice){
+ const g=db.goals.find(x=>x.id===gid), locked=!!g&&db.entries.some(e=>e.goalId===g.id);
+ const scope=g?scopeOf(g):(preferredScope||((preselect||db.people.length)?"person":"office"));
+ if(scope==="person"&&!db.people.length){toast("Inserisci prima un collaboratore, oppure crea un obiettivo d'ufficio");change("people");return;}
+ const p=g?.personId||preselect||db.people[0]?.id;
+ const oid=g?.officeId||preferredOffice||(ui.office!=="all"?ui.office:db.offices[0].id);
+ const peopleOpts=db.people.map(x=>({id:x.id,name:x.name+" · "+(office(x.officeId)?.name||"")}));
+ const body=`<label class="field">Ambito dell'obiettivo<select id="goalScope" name="scope" ${locked?"disabled":""}><option value="office" ${scope==="office"?"selected":""}>Intero ufficio postale</option><option value="person" ${scope==="person"?"selected":""}>Singolo collaboratore</option></select></label>${locked?`<input type="hidden" name="scope" value="${esc(scope)}"><div class="info-line">L'ambito non può cambiare dopo la registrazione dei risultati. Puoi modificare nome, target e categoria.</div>`:""}
+ <div class="field" id="officeGoalTarget" ${scope!=="office"?'style="display:none"':""}><label>Ufficio di riferimento<select name="officeId" ${scope==="office"?"required":""}>${selectOpts(db.offices,oid)}</select></label></div>
+ <div class="field" id="personGoalTarget" ${scope!=="person"?'style="display:none"':""}><label>Collaboratore<select name="personId" ${scope==="person"?"required":""}>${selectOpts(peopleOpts,p)}</select></label></div>
+ ${input("Nome indicatore","name",g?.name||"","text",'maxlength="100"')}
+ <div class="form-grid"><label class="field">Categoria<select name="category">${catalogOpts("categories",g?.category||db.catalogs.categories[0])}</select>${quickCatalog("categories","Nuova categoria")}</label><label class="field">Unità<select name="unit">${catalogOpts("units",g?.unit||db.catalogs.units[0])}</select>${quickCatalog("units","Nuova unità")}</label></div>
+ ${input("Target mensile","target",g?.target??"","number",'min="0.000001" step="any"')}
+ <label class="field">Tipo di misurazione<select name="mode" id="goalMode"><option value="sum" ${g?.mode!=="latest"?"selected":""}>Somma dei risultati giornalieri</option><option value="latest" ${g?.mode==="latest"?"selected":""}>Ultimo valore registrato (es. percentuale)</option></select></label>
+ <div class="info-line">Gli obiettivi d'ufficio di tipo <b>Somma</b> permettono di registrare i contributi di ogni collaboratore. I target <b>Ultimo valore</b> sono compilati soltanto come dato di ufficio.</div>`;
+ showModal(g?"Modifica obiettivo":"Nuovo obiettivo",body,"goal",gid);
+}
+
 function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
 function csv(rows){return "\uFEFF"+rows.map(r=>r.map(x=>`"${String(x??"").replaceAll('"','""')}"`).join(";")).join("\r\n");}
 function backup(){download("Manicomio_backup_"+day()+".json",JSON.stringify(db,null,2),"application/json");}
@@ -208,26 +226,31 @@ function csvEntries(){const rows=[["Data","Ufficio","Collaboratore","Obiettivo",
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav){ui.page=nav.dataset.nav;if(ui.page==="daily"&&ui.office==="all")ui.office=db.offices[0].id;render();window.scrollTo(0,0);return;}
 const b=e.target.closest("[data-action]");if(!b)return;const action=b.dataset.action;const k=b.dataset.id;
 if(action==="dismiss"){if(b.classList.contains("shade")&&e.target!==b)return;closeModal();return;}
-if(action==="catalogQuickAdd"){const key=b.dataset.cat;const form=b.closest("form");const field={roles:"role",categories:"category",units:"unit"}[key];catalogAdd(key,form?.elements.namedItem(field));}
+if(action==="catalogQuickAdd")catalogQuickAdd(b);
+if(action==="catalogQuickSave")catalogQuickSave(b);
 if(action==="catalogAdd")catalogAdd(b.dataset.cat);
 if(action==="catalogRename")catalogRename(b.dataset.cat,b.dataset.value);
 if(action==="catalogRemove")catalogRemove(b.dataset.cat,b.dataset.value);
 if(action==="editOffice")modOffice(k);
 if(action==="person")modPerson(k);
 if(action==="goal")modGoal(k,b.dataset.person);
+if(action==="goalPerson")modGoal(null,null,"person");
+if(action==="goalOffice")modGoal(null,null,"office",k);
 if(action==="jumpOffice"){ui.office=k;ui.page="daily";render();window.scrollTo(0,0);}
-if(action==="deletePerson"){const p=person(k);if(p&&confirm("Eliminare "+p.name+" e tutti i suoi obiettivi e risultati?")){const gids=new Set(db.goals.filter(g=>g.personId===k).map(g=>g.id));db.entries=db.entries.filter(x=>!gids.has(x.goalId));db.goals=db.goals.filter(g=>g.personId!==k);db.people=db.people.filter(x=>x.id!==k);save();render();}}
+if(action==="deletePerson"){const p=person(k);if(p&&db.entries.some(e=>e.personId===k)){alert("Questo collaboratore ha contribuito a obiettivi di ufficio: per mantenere lo storico non può essere eliminato. Puoi spostarlo o rinominarlo.");return;}if(p&&confirm("Eliminare "+p.name+" e tutti i suoi obiettivi e risultati?")){const gids=new Set(db.goals.filter(g=>g.personId===k).map(g=>g.id));db.entries=db.entries.filter(x=>!gids.has(x.goalId));db.goals=db.goals.filter(g=>g.personId!==k);db.people=db.people.filter(x=>x.id!==k);save();render();}}
 if(action==="deleteGoal"){const g=db.goals.find(x=>x.id===k);if(g&&confirm("Eliminare l'obiettivo «"+g.name+"» e tutti i suoi risultati?")){db.goals=db.goals.filter(x=>x.id!==k);db.entries=db.entries.filter(x=>x.goalId!==k);save();render();}}
 if(action==="deleteEntry"){if(confirm("Eliminare questa rilevazione?")){db.entries=db.entries.filter(x=>x.id!==k);save();render();}}
 if(action==="backup")backup();
 if(action==="csvGoals")csvGoals();
 if(action==="csvEntries")csvEntries();
 if(action==="reset"){if(confirm("ATTENZIONE: svuotare tutto l'archivio locale? Assicurati di aver esportato un backup.")&&confirm("Confermi la cancellazione definitiva?")){db=blank();save();ui.office="all";change("dashboard");}}
-if(action==="copyGoals"){const pm=prevMonth(ui.month),src=db.goals.filter(g=>g.month===pm),existing=new Set(db.goals.filter(g=>g.month===ui.month).map(g=>g.personId+"|"+g.name.toLowerCase()));let n=0;for(const g of src){const key=g.personId+"|"+g.name.toLowerCase();if(existing.has(key))continue;db.goals.push({...g,id:id(),month:ui.month});existing.add(key);n++;}save();render();toast(n?n+" obiettivi copiati":"Nessun nuovo obiettivo da copiare");}
+if(action==="copyGoals"){const pm=prevMonth(ui.month),src=db.goals.filter(g=>g.month===pm),keyOf=g=>[scopeOf(g),scopeOf(g)==="office"?g.officeId:g.personId,g.name.toLocaleLowerCase("it"),g.category].join("|"),existing=new Set(db.goals.filter(g=>g.month===ui.month).map(keyOf));let n=0;for(const g of src){const key=keyOf(g);if(existing.has(key))continue;db.goals.push({...g,id:id(),month:ui.month});existing.add(key);n++;}save();render();toast(n?n+" obiettivi copiati":"Nessun nuovo obiettivo da copiare");}
 });
 document.addEventListener("change",async e=>{
 const t=e.target;
-if(t.id==="month"){ui.month=t.value;ui.date=ui.month+"-01";render();return;}
+if(t.id==="month"){ui.month=t.value;ui.date=ui.month+"-01";ui.kpi="";render();return;}
+if(t.id==="kpiFilter"){ui.kpi=t.value;render();return;}
+if(t.id==="goalScope"){const scope=t.value;for(const [which,show] of [["office",scope==="office"],["person",scope==="person"]]){const el=document.getElementById(which==="office"?"officeGoalTarget":"personGoalTarget");if(el){el.style.display=show?"":"none";const sel=el.querySelector("select");if(sel)sel.required=show;}}return;}
 if(t.id==="officeFilter"){ui.office=t.value;render();return;}
 if(t.id==="dailyOffice"){ui.office=t.value;render();return;}
 if(t.id==="dailyDate"){if(t.value.slice(0,7)!==ui.month){alert("Scegli una data del mese selezionato in alto.");render();return;}ui.date=t.value;render();return;}
@@ -235,11 +258,46 @@ if(t.id==="importFile"&&t.files?.[0]){try{const raw=JSON.parse(await t.files[0].
 });
 document.addEventListener("submit",e=>{
 e.preventDefault();const form=e.target;
-if(form.id==="dailyForm"){const d=ui.date.startsWith(ui.month)?ui.date:ui.month+"-01";let n=0;form.querySelectorAll("[data-goal]").forEach(input=>{if(input.value.trim()==="")return;const v=Number(input.value);if(!Number.isFinite(v)||v<0)return;let old=db.entries.find(x=>x.goalId===input.dataset.goal&&x.date===d);if(old)old.value=v;else db.entries.push({id:id(),date:d,goalId:input.dataset.goal,value:v});n++;});if(n){save();render();toast(n+" valori salvati per il "+shortDate(d));}else toast("Nessun valore da salvare");return;}
+if(form.id==="dailyForm"){
+ const d=ui.date.startsWith(ui.month)?ui.date:ui.month+"-01";let n=0;
+ form.querySelectorAll("[data-goal]").forEach(el=>{
+  if(el.value.trim()==="")return;
+  const v=Number(el.value),g=db.goals.find(g=>g.id===el.dataset.goal);
+  if(!g||!Number.isFinite(v)||v<0)return;
+  const pid=scopeOf(g)==="office"?el.dataset.person||"":"";
+  let old=db.entries.find(e=>e.goalId===g.id&&e.date===d&&(scopeOf(g)!=="office"||(e.personId||"")===pid));
+  if(old)old.value=v;
+  else db.entries.push({id:id(),date:d,goalId:g.id,personId:pid,value:v});
+  n++;
+ });
+ if(n){save();render();toast(n+" valori salvati per il "+shortDate(d));}
+ else toast("Nessun valore da salvare");
+ return;
+}
 if(form.id==="editForm"){const x=Object.fromEntries(new FormData(form));const kind=form.dataset.kind,rec=form.dataset.id;
 if(kind==="office"){let o=office(rec);if(o)o.name=String(x.name||"").trim();}
 if(kind==="person"){if(!x.name?.trim())return;let p=person(rec);if(p)Object.assign(p,{name:x.name.trim(),role:x.role,officeId:x.officeId});else db.people.push({id:id(),name:x.name.trim(),role:x.role,officeId:x.officeId});}
-if(kind==="goal"){let p=person(x.personId);if(!p){alert("Collaboratore non valido");return;}const target=Number(x.target);if(!Number.isFinite(target)||target<=0){alert("Inserisci un target maggiore di zero.");return;}let g=db.goals.find(g=>g.id===rec);let obj={personId:x.personId,month:ui.month,name:x.name.trim(),category:x.category,target,unit:x.unit,mode:x.mode};if(g)Object.assign(g,obj);else db.goals.push({id:id(),...obj});}
+if(kind==="goal"){
+ const scope=x.scope==="office"?"office":"person",target=Number(x.target),g=db.goals.find(g=>g.id===rec);
+ if(scope==="person"&&!person(x.personId)){alert("Seleziona un collaboratore valido.");return;}
+ if(scope==="office"&&!office(x.officeId)){alert("Seleziona un ufficio valido.");return;}
+ if(!x.name?.trim()||!Number.isFinite(target)||target<=0){alert("Inserisci nome e target maggiore di zero.");return;}
+ if(g&&db.entries.some(e=>e.goalId===g.id)&&(scopeOf(g)!==scope||(scope==="office"&&g.officeId!==x.officeId)||(scope==="person"&&g.personId!==x.personId)||(g.mode!==x.mode))){alert("Con risultati già registrati non puoi cambiare ambito, destinatario o modalità di calcolo.");return;}
+ const obj={scope,personId:scope==="person"?x.personId:null,officeId:scope==="office"?x.officeId:null,month:ui.month,name:x.name.trim(),category:x.category,target,unit:x.unit,mode:x.mode};
+ if(g)Object.assign(g,obj);else db.goals.push({id:id(),...obj});
+}
+if(kind==="catalog"){
+ const key=x.catalogKey,value=catalogValue(x.name),old=rec;
+ if(!defaults[key]||!value||value.length>80){alert("Inserisci una voce valida da 1 a 80 caratteri.");return;}
+ if(catalogDuplicate(key,value,old)){alert("Esiste già una voce con questo nome.");return;}
+ if(old){
+  const pos=db.catalogs[key].indexOf(old);if(pos<0)return;
+  db.catalogs[key][pos]=value;
+  if(key==="roles")for(const p of db.people)if(p.role===old)p.role=value;
+  if(key==="categories")for(const g of db.goals)if(g.category===old)g.category=value;
+  if(key==="units")for(const g of db.goals)if(g.unit===old)g.unit=value;
+ }else db.catalogs[key].push(value);
+}
 if(save()){closeModal();render();toast("Salvato correttamente");}
 }
 });
