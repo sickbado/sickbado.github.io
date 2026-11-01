@@ -191,15 +191,15 @@ function rankingPage(){
  ${data.gs.slice().sort((a,b)=>pct(b)-pct(a)).map(g=>`<button class="office-line" data-action="jumpOffice" data-id="${esc(g.officeId)}"><div><b>${esc(goalLocation(g))}</b><small>${pretty(g,val(g))} / ${pretty(g,g.target)}</small></div>${pBar(pct(g))}<strong>${Math.round(pct(g))}%</strong></button>`).join("")}</section></div>
  <p class="note">Le classifiche confrontano soltanto lo stesso indicatore (nome, categoria, unità e modalità di calcolo). Le cifre di natura diversa non vengono sommate. I collaboratori senza risultati compaiono con zero. Le prestazioni vanno lette alla luce di presenze, incarichi e opportunità effettive.</p>`}`;
 }
-const REPORT_HEADERS=["Versione","Codice ufficio","Ufficio","Data","Codice obiettivo","Ambito","Obiettivo","Categoria","Unità","Codice collaboratore","Collaboratore","Risultato","Note"];
-const REPORT_VERSION="MANICOMIO-REPORT-1";
+const REPORT_HEADERS=["Versione","Codice ufficio","Ufficio","Data","Codice obiettivo","Ambito","Obiettivo","Categoria","Unità","Target mensile","Codice collaboratore","Collaboratore","Risultato","Note"];
+const REPORT_VERSION="MANICOMIO-REPORT-2";
 function reportOffice(){return db.offices.find(o=>o.id===ui.reportOffice)||(ui.office!=="all"?office(ui.office):null)||db.offices[0];}
 
 function reportDate(d){const [y,m,dd]=d.split("-");return dd+"/"+m+"/"+y;}
 
 function reportDateParse(x){
  const s=String(x||"").trim();
- if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+ if(/^\d{4}-\d{2}-\d{2}$/.test(s)){const dt=new Date(s+"T12:00:00");return Number.isFinite(dt.getTime())&&dt.toISOString().slice(0,10)===s?s:null;}
  if(/^\d{1,2}[./-]\d{1,2}[./-]\d{4}$/.test(s)){
   const [dd,mm,yy]=s.split(/[./-]/).map(Number),t=`${yy}-${pad(mm)}-${pad(dd)}`;
   const dt=new Date(t+"T12:00:00");
@@ -263,7 +263,7 @@ function generateReport(which){
    if(scopeOf(g)==="person"&&!p)continue;
    const pid=scopeOf(g)==="office"?p?.id||"":g.personId;
    const e=db.entries.find(e=>e.goalId===g.id&&e.date===d&&(scopeOf(g)==="person"||(e.personId||"")===pid));
-   rows.push([REPORT_VERSION,o.id,o.name,reportDate(d),g.id,scopeOf(g)==="office"?"Ufficio":"Individuale",g.name,g.category,g.unit,pid,p?.name||(scopeOf(g)==="office"?"Non attribuito":""),e?String(Number(e.value)).replace(".",","):"",e?.note||""]);
+   rows.push([REPORT_VERSION,o.id,o.name,reportDate(d),g.id,scopeOf(g)==="office"?"Ufficio":"Individuale",g.name,g.category,g.unit,String(Number(g.target)).replace(".",","),pid,p?.name||(scopeOf(g)==="office"?"Non attribuito":""),e?String(Number(e.value)).replace(".",","):"",e?.note||""]);
   }
  }
  const name=o.name.normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_").slice(0,36)||"Ufficio";
@@ -280,14 +280,14 @@ function buildReportPreview(textContent,fileName){
  for(let i=1;i<all.length;i++){
   const row=all[i],line=i+1;
   if(row.length!==REPORT_HEADERS.length){errs.push(`Riga ${line}: numero di colonne errato (${row.length}).`);continue;}
-  const [version,oid,officeName,dateRaw,gid,scope,name,category,unit,pid,personName,resultRaw,noteRaw]=row;
+  const [version,oid,officeName,dateRaw,gid,scope,name,category,unit,targetRaw,pid,personName,resultRaw,noteRaw]=row;
   if(!String(resultRaw).trim()){blank++;continue;}
   if(version!==REPORT_VERSION){errs.push(`Riga ${line}: versione report non valida.`);continue;}
   const o=office(oid),g=db.goals.find(g=>g.id===gid),dt=reportDateParse(dateRaw);
   const value=numberParse(resultRaw);
   if(!o||!g||!dt||!Number.isFinite(value)||value<0){errs.push(`Riga ${line}: codice ufficio, codice obiettivo, data o risultato non valido.`);continue;}
   if(officeForGoal(g)!==oid||dt.slice(0,7)!==g.month){errs.push(`Riga ${line}: obiettivo non associato a questa sede o al mese del risultato.`);continue;}
-  if(scopeOf(g)!==(scope==="Ufficio"?"office":"person")||g.unit!==unit){errs.push(`Riga ${line}: ambito oppure unità dell'obiettivo modificati.`);continue;}
+  if(scopeOf(g)!==(scope==="Ufficio"?"office":"person")||g.unit!==unit||numberParse(targetRaw)!==Number(g.target)){errs.push(`Riga ${line}: ambito, unità o target mensile modificati.`);continue;}
   if(scopeOf(g)==="person"&&g.personId!==pid){errs.push(`Riga ${line}: codice collaboratore non associato all'obiettivo individuale.`);continue;}
   if(scopeOf(g)==="office"&&pid&&(g.mode==="latest"||!person(pid)||person(pid).officeId!==oid)){errs.push(`Riga ${line}: collaboratore non valido per questo ufficio.`);continue;}
   if(officeName!==o.name||name!==g.name||category!==g.category||(pid&&person(pid)?.name!==personName)){errs.push(`Riga ${line}: descrizioni non corrispondenti ai codici attuali. Genera un report aggiornato.`);continue;}
