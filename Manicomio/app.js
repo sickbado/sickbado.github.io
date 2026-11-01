@@ -80,7 +80,7 @@ function csvGoals(){const rows=[["Mese","Ufficio","Collaboratore","Ruolo","Obiet
 function csvEntries(){const rows=[["Data","Ufficio","Collaboratore","Obiettivo","Categoria","Valore","Unità"]];db.entries.filter(e=>e.date.startsWith(ui.month)).forEach(e=>{const g=db.goals.find(g=>g.id===e.goalId),p=g&&person(g.personId);rows.push([e.date,office(p?.officeId)?.name,p?.name,g?.name,g?.category,e.value,g?.unit]);});download("Manicomio_rilevazioni_"+ui.month+".csv",csv(rows),"text/csv;charset=utf-8");}
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav){ui.page=nav.dataset.nav;if(ui.page==="daily"&&ui.office==="all")ui.office=db.offices[0].id;render();window.scrollTo(0,0);return;}
 const b=e.target.closest("[data-action]");if(!b)return;const action=b.dataset.action;const k=b.dataset.id;
-if(action==="dismiss"){if(e.target.closest(".modal")&&e.target.classList.contains("shade"))return;closeModal();return;}
+if(action==="dismiss"){if(b.classList.contains("shade")&&e.target!==b)return;closeModal();return;}
 if(action==="editOffice")modOffice(k);
 if(action==="person")modPerson(k);
 if(action==="goal")modGoal(k,b.dataset.person);
