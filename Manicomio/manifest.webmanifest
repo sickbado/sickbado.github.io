@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Manicomio · Direzione rete",
+  "short_name": "Manicomio",
+  "description": "Obiettivi e risultati quotidiani degli uffici di prossimità",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fc",
+  "theme_color": "#003d80",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}
