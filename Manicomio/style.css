@@ -52,3 +52,25 @@
 .catalog-add-inline input{flex:1 1 120px;width:145px;min-width:0}
 .catalog-add-inline .secondary{font-size:11px;padding:7px 11px}
 @media(max-width:760px){.action-row{display:flex;flex-wrap:wrap}.section-title .action-row{width:100%}.section-title .action-row>button{flex:1;white-space:nowrap}.bottom-nav{justify-content:flex-start}.bottom-nav button{flex:1 0 49px;min-width:49px}.bottom-nav button b{font-size:8px}.leader-row{gap:8px}.filters.two{gap:10px}}
+
+/* Report degli uffici: distribuzione e caricamento CSV */
+.report-builder{margin-bottom:16px;display:flex;flex-direction:column;gap:13px}
+.report-builder .panel-head{margin-bottom:0}
+.report-upload{display:flex;align-items:center;justify-content:flex-start;width:100%;background:#f7faff;min-height:72px;padding:17px;flex-wrap:wrap;border-radius:14px}
+.report-upload input{flex:1;max-width:100%;width:100%;font-size:12px}
+.report-preview{display:grid;gap:14px;margin-bottom:16px;border:2px solid #f2cc25}
+.report-preview p{color:#536983;font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.report-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.report-summary span{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#f1f6fd;border:1px solid #e1eaf4;border-radius:11px;padding:12px 7px;font-size:10px;color:#627b99;min-height:65px}
+.report-summary b{display:block;color:var(--blue);font-size:19px;margin-bottom:5px}
+.report-preview-lines{display:grid;gap:6px}
+.report-preview-lines>div{border-bottom:1px solid #edf2f7;font-size:11px;padding:8px 0;line-height:1.5;display:flex;justify-content:space-between;gap:10px;color:#526986}
+.report-preview-lines b{color:var(--blue);white-space:nowrap}
+.report-errors{margin-top:8px;max-height:180px;overflow-y:auto}
+.report-errors p{margin-bottom:6px}
+.report-log{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 4px;border-bottom:1px solid #eaf0f7}
+.report-log:last-child{border:0}
+.report-log b{display:block;font-size:12px;color:var(--ink)}
+.report-log small{display:block;color:var(--grey);font-size:10px;margin-top:5px;line-height:1.4;overflow-wrap:anywhere}
+.report-log>span{color:var(--blue);font-weight:800;font-size:11px;white-space:nowrap}
+@media(max-width:750px){.report-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.report-log{align-items:flex-start;flex-direction:column;gap:5px}.report-log>span{white-space:normal}}
