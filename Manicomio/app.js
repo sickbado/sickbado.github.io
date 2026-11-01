@@ -270,6 +270,91 @@ function generateReport(which){
  download(`Manicomio_Report_${name}_${which==="day"?ui.date:ui.month}.csv`,reportCsv(rows),"text/csv;charset=utf-8");
  toast(rows.length-1+" righe esportate per "+o.name);
 }
+function buildReportPreview(textContent,fileName){
+ const all=csvParse(textContent);
+ if(all.length<2)throw Error("Il file è vuoto oppure non contiene risultati.");
+ const hdr=all[0].map(s=>s.trim().toLowerCase());
+ if(REPORT_HEADERS.some((h,i)=>hdr[i]!==h.toLowerCase()))throw Error("Colonne non riconosciute. Scarica un report dall'app e non modificare i titoli delle colonne.");
+ const records=[],errs=[],seen=new Set(),officeSet=new Set(),monthSet=new Set();
+ let blank=0,equal=0,newCount=0,changed=0;
+ for(let i=1;i<all.length;i++){
+  const row=all[i],line=i+1;
+  if(row.length!==REPORT_HEADERS.length){errs.push(`Riga ${line}: numero di colonne errato (${row.length}).`);continue;}
+  const [version,oid,officeName,dateRaw,gid,scope,name,category,unit,pid,personName,resultRaw,noteRaw]=row;
+  if(!String(resultRaw).trim()){blank++;continue;}
+  if(version!==REPORT_VERSION){errs.push(`Riga ${line}: versione report non valida.`);continue;}
+  const o=office(oid),g=db.goals.find(g=>g.id===gid),dt=reportDateParse(dateRaw);
+  const value=numberParse(resultRaw);
+  if(!o||!g||!dt||!Number.isFinite(value)||value<0){errs.push(`Riga ${line}: codice ufficio, codice obiettivo, data o risultato non valido.`);continue;}
+  if(officeForGoal(g)!==oid||dt.slice(0,7)!==g.month){errs.push(`Riga ${line}: obiettivo non associato a questa sede o al mese del risultato.`);continue;}
+  if(scopeOf(g)!==(scope==="Ufficio"?"office":"person")||g.unit!==unit){errs.push(`Riga ${line}: ambito oppure unità dell'obiettivo modificati.`);continue;}
+  if(scopeOf(g)==="person"&&g.personId!==pid){errs.push(`Riga ${line}: codice collaboratore non associato all'obiettivo individuale.`);continue;}
+  if(scopeOf(g)==="office"&&pid&&(g.mode==="latest"||!person(pid)||person(pid).officeId!==oid)){errs.push(`Riga ${line}: collaboratore non valido per questo ufficio.`);continue;}
+  if(officeName!==o.name||name!==g.name||category!==g.category||(pid&&person(pid)?.name!==personName)){errs.push(`Riga ${line}: descrizioni non corrispondenti ai codici attuali. Genera un report aggiornato.`);continue;}
+  const key=[gid,dt,scopeOf(g)==="office"?pid:""].join("|");
+  if(seen.has(key)){errs.push(`Riga ${line}: risultato duplicato nello stesso file (stesso giorno, obiettivo e collaboratore).`);continue;}
+  seen.add(key);officeSet.add(oid);monthSet.add(dt.slice(0,7));
+  const old=db.entries.find(e=>e.goalId===gid&&e.date===dt&&(scopeOf(g)==="person"||(e.personId||"")===pid));
+  const note=String(noteRaw||"").slice(0,500);
+  const status=old?(Number(old.value)===value&&(old.note||"")===note?"uguale":"aggiornato"):"nuovo";
+  if(status==="nuovo")newCount++;if(status==="aggiornato")changed++;if(status==="uguale")equal++;
+  records.push({id:old?.id||id(),goalId:gid,date:dt,personId:scopeOf(g)==="office"?pid:"",value,note,status,display:`${reportDate(dt)} · ${o.name} · ${g.name} · ${pid?person(pid)?.name:"Non attribuito"}: ${String(value).replace(".",",")}`});
+ }
+ if(officeSet.size>1||monthSet.size>1)errs.push("Un report può contenere dati di un solo ufficio e di un solo mese.");
+ const sourceOffice=officeSet.size===1?office([...officeSet][0]):null;
+ return {filename:fileName,records,errors:errs,blank,newCount,changed,equal,officeId:sourceOffice?.id||"",officeName:sourceOffice?.name||"",month:monthSet.size===1?[...monthSet][0]:""};
+}
+
+function reportImportPreview(v){
+ if(!v)return "";
+ const valid=v.errors.length===0&&v.records.length>0&&(v.newCount+v.changed)>0;
+ return `<section class="panel report-preview">
+  <div class="panel-head"><h3>Anteprima importazione</h3><button class="secondary" data-action="reportClear">Annulla</button></div>
+  <p><b>${esc(v.filename)}</b> · ${esc(v.officeName||"Ufficio non riconosciuto")} · ${esc(v.month)}</p>
+  <div class="report-summary"><span><b>${v.newCount}</b> nuovi</span><span><b>${v.changed}</b> correzioni</span><span><b>${v.equal}</b> già presenti</span><span><b>${v.blank}</b> vuoti</span><span><b>${v.errors.length}</b> errori</span></div>
+  ${v.errors.length?`<div class="alert"><b>Importazione bloccata: verifica il file.</b><div class="report-errors">${v.errors.slice(0,12).map(x=>`<p>${esc(x)}</p>`).join("")}${v.errors.length>12?`<p>… e altri ${v.errors.length-12} errori.</p>`:""}</div></div>`:""}
+  <div class="report-preview-lines">${v.records.filter(x=>x.status!=="uguale").slice(0,8).map(x=>`<div>${esc(x.display)} <b>${x.status==="nuovo"?"Nuovo":"Correzione"}</b></div>`).join("")}</div>
+  ${v.records.length===0?`<p>Nessun valore compilato: inserisci almeno un risultato nel file.</p>`:""}
+  ${!v.errors.length&&v.records.length&&!(v.newCount+v.changed)?`<p>Non ci sono differenze da importare: i risultati sono già registrati.</p>`:""}
+  <button class="primary" data-action="reportCommit" ${valid?"":"disabled"}>Conferma importazione (${v.newCount+v.changed} risultati)</button>
+ </section>`;
+}
+
+function reportsPage(){
+ const o=reportOffice(),gs=o?reportGoals(o.id):[];
+ const last=(db.reportImports||[]).slice(-10).reverse();
+ return `<div class="section-title"><div><h2>Report per ufficio</h2><p>Genera i modelli da consegnare ai direttori, poi importa i CSV compilati nella dashboard GeoPostale.</p></div></div>
+ <section class="panel report-builder"><div class="panel-head"><h3>1. Prepara il report da consegnare</h3><span class="tag">Compatibile con Excel</span></div>
+ <div class="filters two"><label>Ufficio<select id="reportOffice">${selectOpts(db.offices,o?.id)}</select></label><label>Giornata di riferimento<input type="date" id="reportDate" value="${esc(ui.date.slice(0,7)===ui.month?ui.date:ui.month+"-01")}"></label></div>
+ <p class="subtle">${gs.length} obiettivi configurati per ${esc(o?.name||"")}. Il modello contiene collaboratori, obiettivi e codici di riconoscimento.</p>
+ <div class="action-row" style="margin-top:15px"><button class="primary" data-action="reportDaily" ${gs.length?"":"disabled"}>↓ Modello giornaliero CSV</button><button class="secondary" data-action="reportMonthly" ${gs.length?"":"disabled"}>↓ Modello mensile CSV</button></div>
+ ${!gs.length?`<div class="info-line">Assegna prima almeno un obiettivo di ufficio o individuale, quindi torna qui per generare il report.</div>`:""}</section>
+ <section class="panel report-builder"><div class="panel-head"><h3>2. Importa il file ricevuto</h3><span class="tag light">Controllo prima del salvataggio</span></div>
+ <p class="subtle">Il direttore compila soltanto <b>Risultato</b> e, facoltativamente, <b>Note</b>. Le colonne di identificazione non devono essere modificate. Il formato richiesto è CSV con separatore punto e virgola.</p>
+ <label class="file report-upload"><input id="reportUpload" type="file" accept=".csv,text/csv,text/plain"> Seleziona il report compilato (.csv)</label>
+ <p class="note">Puoi consegnare il modello tramite un canale aziendale autorizzato. Carica qui i report ricevuti: se importi nuovamente lo stesso valore, non viene sommato due volte.</p></section>
+ ${reportImportPreview(ui.reportPreview)}
+ <section class="panel report-builder"><div class="panel-head"><h3>Ultimi report importati</h3><span class="subtle">Archivio locale</span></div>
+ ${!last.length?`<div class="empty"><b>Non hai ancora importato report.</b><p>Qui compariranno ufficio, mese e data dell'importazione.</p></div>`:last.map(x=>`<div class="report-log"><div><b>${esc(office(x.officeId)?.name||"Ufficio")}</b><small>${esc(x.month)} · ${esc(x.filename)} · ${esc(new Date(x.at).toLocaleString("it-IT"))}</small></div><span>${x.created} nuovi · ${x.updated} corretti</span></div>`).join("")}</section>
+ <section class="panel"><h3>Indicazioni per i direttori</h3><p class="note">1. Aprire il CSV in Excel. 2. Compilare solo <b>Risultato</b> e, se necessario, <b>Note</b>. 3. Lasciare vuote le righe senza dati; digitare 0 se il risultato è zero. 4. Salvare in formato CSV UTF-8, con separatore punto e virgola, e restituire il file. Non modificare i codici né i nomi degli obiettivi.</p></section>`;
+}
+
+function commitReport(){
+ const v=ui.reportPreview;
+ if(!v||v.errors.length||!(v.newCount+v.changed)||!v.officeId)return;
+ if(!confirm(`Confermi ${v.newCount} nuovi risultati e ${v.changed} correzioni per ${v.officeName} (${v.month})?`))return;
+ for(const r of v.records){
+  if(r.status==="uguale")continue;
+  const g=db.goals.find(g=>g.id===r.goalId);
+  const idx=db.entries.findIndex(e=>e.goalId===r.goalId&&e.date===r.date&&(scopeOf(g)==="person"||(e.personId||"")===r.personId));
+  const updated={id:idx<0?r.id:db.entries[idx].id,goalId:r.goalId,date:r.date,personId:r.personId,value:r.value,note:r.note};
+  if(idx<0)db.entries.push(updated);else db.entries[idx]=updated;
+ }
+ if(!Array.isArray(db.reportImports))db.reportImports=[];
+ db.reportImports.push({id:id(),officeId:v.officeId,month:v.month,filename:v.filename,at:new Date().toISOString(),created:v.newCount,updated:v.changed});
+ if(db.reportImports.length>200)db.reportImports=db.reportImports.slice(-200);
+ if(save()){const n=v.newCount+v.changed;ui.reportPreview=null;render();toast(n+" risultati acquisiti. Classifiche aggiornate.");}
+}
 function catalogSection(){
   const list=(key)=>`<div class="catalog-group"><div class="catalog-group-top"><div><h3>${esc(catalogLabels[key])}</h3><p>${key==="roles"?"Modifica i ruoli disponibili nelle schede dei collaboratori.":key==="categories"?"Personalizza le categorie associate agli obiettivi.":"Aggiungi o modifica le unità usate nei target."}</p></div><button type="button" class="secondary" data-action="catalogAdd" data-cat="${key}">+ Aggiungi</button></div><div class="catalog-items">${db.catalogs[key].map(value=>`<div class="catalog-row"><span><b>${esc(value)}</b><small>${catalogUsage(key,value)} ${key==="roles"?"collaboratori":"obiettivi"} collegati</small></span><div class="catalog-actions"><button class="icon-button" type="button" title="Rinomina voce" aria-label="Rinomina ${esc(value)}" data-action="catalogRename" data-cat="${key}" data-value="${esc(value)}">✎</button><button class="icon-button" type="button" title="Elimina voce" aria-label="Elimina ${esc(value)}" data-action="catalogRemove" data-cat="${key}" data-value="${esc(value)}">×</button></div></div>`).join("")}</div></div>`;
   return `<div class="catalog-management"><div><h2>Personalizza le categorie</h2><p>Aggiungi, rinomina o elimina le voci dei menu senza perdere le assegnazioni. Le rinomine si applicano automaticamente anche ai dati esistenti.</p></div>${["roles","categories","units"].map(list).join("")}</div>`;
@@ -348,12 +433,25 @@ if(action==="backup")backup();
 if(action==="csvGoals")csvGoals();
 if(action==="csvEntries")csvEntries();
 if(action==="csvContributions")csvContributions();
+if(action==="reportDaily")generateReport("day");
+if(action==="reportMonthly")generateReport("month");
+if(action==="reportClear"){ui.reportPreview=null;render();}
+if(action==="reportCommit")commitReport();
 if(action==="reset"){if(confirm("ATTENZIONE: svuotare tutto l'archivio locale? Assicurati di aver esportato un backup.")&&confirm("Confermi la cancellazione definitiva?")){db=blank();save();ui.office="all";change("dashboard");}}
 if(action==="copyGoals"){const pm=prevMonth(ui.month),src=db.goals.filter(g=>g.month===pm),keyOf=g=>[scopeOf(g),scopeOf(g)==="office"?g.officeId:g.personId,g.name.toLocaleLowerCase("it"),g.category].join("|"),existing=new Set(db.goals.filter(g=>g.month===ui.month).map(keyOf));let n=0;for(const g of src){const key=keyOf(g);if(existing.has(key))continue;db.goals.push({...g,id:id(),month:ui.month});existing.add(key);n++;}save();render();toast(n?n+" obiettivi copiati":"Nessun nuovo obiettivo da copiare");}
 });
 document.addEventListener("change",async e=>{
 const t=e.target;
-if(t.id==="month"){ui.month=t.value;ui.date=ui.month+"-01";ui.kpi="";render();return;}
+if(t.id==="month"){ui.month=t.value;ui.date=ui.month+"-01";ui.kpi="";ui.reportPreview=null;render();return;}
+if(t.id==="reportOffice"){ui.reportOffice=t.value;ui.reportPreview=null;render();return;}
+if(t.id==="reportDate"){if(!t.value.startsWith(ui.month)){alert("La data deve appartenere al mese selezionato.");render();return;}ui.date=t.value;return;}
+if(t.id==="reportUpload"&&t.files?.[0]){
+ try{
+  if(t.files[0].size>5*1024*1024)throw Error("Il file supera il limite di 5 MB.");
+  ui.reportPreview=buildReportPreview(await t.files[0].text(),t.files[0].name);render();toast("Report controllato: verifica anteprima");
+ }catch(err){ui.reportPreview=null;render();alert("Lettura report non riuscita: "+err.message);}
+ return;
+}
 if(t.id==="kpiFilter"){ui.kpi=t.value;render();return;}
 if(t.id==="goalScope"){const scope=t.value;for(const [which,show] of [["office",scope==="office"],["person",scope==="person"]]){const el=document.getElementById(which==="office"?"officeGoalTarget":"personGoalTarget");if(el){el.style.display=show?"":"none";const sel=el.querySelector("select");if(sel)sel.required=show;}}return;}
 if(t.id==="officeFilter"){ui.office=t.value;render();return;}
