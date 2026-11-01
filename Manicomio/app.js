@@ -13,7 +13,7 @@ function normalizeCatalog(data){
   for(const [key,items,field] of [["roles",data.people,"role"],["categories",data.goals,"category"],["units",data.goals,"unit"]]){
     for(const item of items||[])if(typeof item[field]==="string"&&item[field].trim()&&!data.catalogs[key].includes(item[field]))data.catalogs[key].push(item[field]);
   }
-  data.version=2;
+  data.version=3;
 }
 const pad=n=>String(n).padStart(2,"0");
 const day=(d=new Date())=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -24,22 +24,41 @@ const shortDate=x=>x?x.split("-").reverse().join("/"):"";
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=n=>Number(n||0).toLocaleString("it-IT",{maximumFractionDigits:1});
 const id=()=>((globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
-const blank=()=>({version:2,offices:Array.from({length:13},(_,i)=>({id:"u"+i,name:i?"Ufficio di prossimità "+pad(i):"Ufficio principale"})),people:[],goals:[],entries:[],catalogs:{roles:[...defaults.roles],categories:[...defaults.categories],units:[...defaults.units]}});
+const blank=()=>({version:3,offices:Array.from({length:13},(_,i)=>({id:"u"+i,name:i?"Ufficio di prossimità "+pad(i):"Ufficio principale"})),people:[],goals:[],entries:[],catalogs:{roles:[...defaults.roles],categories:[...defaults.categories],units:[...defaults.units]}});
 let db;try{db=JSON.parse(localStorage.getItem(KEY));if(!db||!Array.isArray(db.offices)||!Array.isArray(db.people)||!Array.isArray(db.goals)||!Array.isArray(db.entries))db=blank();}catch{db=blank();}
 normalizeCatalog(db);
-let ui={page:"dashboard",month:month(),office:"all",date:day(),filter:"all"};
+let ui={page:"dashboard",month:month(),office:"all",date:day(),filter:"all",kpi:""};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db));return true;}catch{alert("Memoria del dispositivo piena: esporta subito un backup JSON.");return false;}};
 const $=sel=>document.querySelector(sel);
 const office=o=>db.offices.find(x=>x.id===o);
 const person=p=>db.people.find(x=>x.id===p);
-const ownGoals=p=>db.goals.filter(g=>g.personId===p&&g.month===ui.month);
-const val=g=>{let ar=db.entries.filter(e=>e.goalId===g.id&&e.date.slice(0,7)===g.month).sort((a,b)=>a.date.localeCompare(b.date));return g.mode==="latest"?(ar.length?ar[ar.length-1].value:0):ar.reduce((s,e)=>s+Number(e.value),0);};
+const scopeOf=g=>g?.scope==="office"?"office":"person";
+const officeForGoal=g=>scopeOf(g)==="office"?g.officeId:person(g.personId)?.officeId;
+const ownGoals=p=>db.goals.filter(g=>scopeOf(g)==="person"&&g.personId===p&&g.month===ui.month);
+const officeGoals=o=>db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office"&&g.officeId===o);
+const goalLabel=g=>scopeOf(g)==="office"?"UFF · "+(office(g.officeId)?.name||"Ufficio"):(person(g.personId)?.name||"Collaboratore rimosso");
+const goalLocation=g=>office(officeForGoal(g))?.name||"Ufficio non trovato";
+const entryPerson=e=>e.personId?person(e.personId)?.name||"Collaboratore rimosso":scopeOf(db.goals.find(g=>g.id===e.goalId))==="office"?"Non attribuito":goalLabel(db.goals.find(g=>g.id===e.goalId));
+const officeEntry=(g,d,pid)=>db.entries.find(e=>e.goalId===g.id&&e.date===d&&(e.personId||"")===(pid||""));
+const kpiKey=g=>JSON.stringify([g.name.trim().toLocaleLowerCase("it"),g.category,g.unit,g.mode]);
+const kpiOptions=()=>{const map=new Map();for(const g of db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office")){const k=kpiKey(g);if(!map.has(k))map.set(k,{key:k,label:g.name+" · "+g.unit,name:g.name,unit:g.unit});}return [...map.values()].sort((a,b)=>a.label.localeCompare(b.label,"it"));};
+const officeContribution=(g,pid)=>db.entries.filter(e=>e.goalId===g.id&&(e.personId||"")===(pid||"")&&e.date.startsWith(g.month)).reduce((a,e)=>a+Number(e.value||0),0);
+const leaderData=(selected,filterOffice="all")=>{
+ const gs=db.goals.filter(g=>g.month===ui.month&&scopeOf(g)==="office"&&kpiKey(g)===selected&&(filterOffice==="all"||g.officeId===filterOffice));
+ const included=new Set(gs.map(g=>g.officeId));const members=db.people.filter(p=>included.has(p.officeId));
+ const results=members.map(p=>({...p,result:gs.reduce((sum,g)=>sum+officeContribution(g,p.id),0)})).sort((a,b)=>b.result-a.result||a.name.localeCompare(b.name,"it"));
+ return {gs,members:results,total:gs.reduce((a,g)=>a+val(g),0),target:gs.reduce((a,g)=>a+Number(g.target),0),unassigned:gs.reduce((a,g)=>a+officeContribution(g,""),0)};
+};
+const val=g=>{
+ const ar=db.entries.filter(e=>e.goalId===g.id&&e.date.slice(0,7)===g.month).sort((a,b)=>a.date.localeCompare(b.date));
+ return g.mode==="latest"?(ar.length?Number(ar[ar.length-1].value):0):ar.reduce((s,e)=>s+Number(e.value),0);
+};
 const pct=g=>g.target>0?val(g)*100/g.target:0;
 const pretty=(g,x)=>g.unit==="€"?"€ "+fmt(x):fmt(x)+(g.unit==="n."?"":g.unit==="%"?"%":g.unit==="ore"?" h":" "+(g.unit||""));
 const daysIn=m=>{const [y,n]=m.split("-").map(Number);return new Date(y,n,0).getDate();};
 const expected=m=>{let cnt=0,elapsed=0;for(let n=1;n<=daysIn(m);n++){const d=new Date(m+"-"+pad(n)+"T12:00:00");if(d.getDay()===0)continue;cnt++;if(day(d)<=day())elapsed++;}return cnt?elapsed/cnt:0;};
 const goalScore=gs=>gs.length?gs.reduce((s,g)=>s+Math.min(150,pct(g)),0)/gs.length:0;
-const avgOffice=o=>goalScore(db.goals.filter(g=>g.month===ui.month&&person(g.personId)?.officeId===o));
+const avgOffice=o=>goalScore(db.goals.filter(g=>g.month===ui.month&&officeForGoal(g)===o));
 const pBar=(n)=>`<div class="bar"><span style="width:${Math.max(0,Math.min(100,n))}%"></span></div>`;
 const selectOpts=(arr,selected)=>arr.map(x=>`<option value="${esc(x.id)}" ${x.id===selected?"selected":""}>${esc(x.name)}</option>`).join("");
 const catalogOpts=(key,selected)=>db.catalogs[key].map(x=>`<option value="${esc(x)}" ${x===selected?"selected":""}>${esc(x)}</option>`).join("");
@@ -84,43 +103,92 @@ function catalogRemove(key,value){
   db.catalogs[key].splice(index,1);
   if(save()){render();toast("Voce eliminata");}
 }
-const icon=(name)=>({dashboard:"▦",offices:"▣",people:"♙",goals:"◎",daily:"✎",history:"◷",settings:"⚙"})[name]||"•";
-const tabs=[["dashboard","Riepilogo"],["offices","Uffici"],["people","Collaboratori"],["goals","Obiettivi"],["daily","Registro"],["history","Storico"],["settings","Impostazioni"]];
+const icon=(name)=>({dashboard:"▦",offices:"▣",people:"♙",goals:"◎",ranking:"★",daily:"✎",history:"◷",settings:"⚙"})[name]||"•";
+const tabs=[["dashboard","Riepilogo"],["offices","Uffici"],["people","Collaboratori"],["goals","Obiettivi"],["ranking","Classifiche"],["daily","Registro"],["history","Storico"],["settings","Impostazioni"]];
 function toast(t){const x=$("#toast");if(x){x.textContent=t;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),2600);}}
 function change(page){ui.page=page;render();window.scrollTo(0,0);}
 function footer(){return `<div class="foot">Manicomio • archivio locale su questo dispositivo • nessuna sincronizzazione cloud</div>`;}
 function top(){return `<header class="top"><div><div class="eyebrow">GESTIONE DIREZIONALE • 13 UFFICI</div><h1>${esc(tabs.find(t=>t[0]===ui.page)?.[1]||"Manicomio")}</h1><p>${esc(dateTitle(ui.month))} · ${db.people.length} collaboratori censiti</p></div><label class="month"><span>Mese</span><input type="month" id="month" value="${esc(ui.month)}"></label></header>`;}
 function nav(){return tabs.map(([p,t])=>`<button data-nav="${p}" class="${ui.page===p?"active":""}"><span>${icon(p)}</span><b>${t}</b></button>`).join("");}
 function render(){document.title="Manicomio · Direzione";$("#app").innerHTML=`<div class="layout"><aside class="side"><div class="brand"><div class="brandmark">M</div><div><strong>Manicomio</strong><small>DIREZIONE RETE</small></div></div><div class="menulabel">LA TUA RETE</div><nav class="side-nav">${nav()}</nav><div class="side-bottom"><div class="side-feature">13 sedi, una sola regia.<br><span>Obiettivi commerciali e gestionali sempre sotto controllo.</span></div><span>Accesso locale · solo direttore</span></div></aside><main class="main">${top()}${page()}${footer()}</main></div><nav class="bottom-nav">${nav()}</nav>`;}
-function page(){switch(ui.page){case"offices":return officesPage();case"people":return peoplePage();case"goals":return goalsPage();case"daily":return dailyPage();case"history":return historyPage();case"settings":return settingsPage();default:return dashboardPage();}}
+function page(){switch(ui.page){case"offices":return officesPage();case"people":return peoplePage();case"goals":return goalsPage();case"daily":return dailyPage();case"ranking":return rankingPage();case"history":return historyPage();case"settings":return settingsPage();default:return dashboardPage();}}
 function dashboardPage(){
-const gs=db.goals.filter(g=>g.month===ui.month);
-const q=expected(ui.month);
-const peopleWithGoals=[...new Set(gs.map(g=>g.personId))].length;
-const below=gs.filter(g=>pct(g)<q*100).length;
-const ofs=db.offices.map(o=>({o,score:avgOffice(o),count:db.people.filter(p=>p.officeId===o.id).length}));
-return `<section class="hero"><div><div class="hero-tag">IL QUADRO DEL MESE</div><h2>Ogni ufficio.<br><em>Un obiettivo chiaro.</em></h2><p>Controlla l'intera rete e registra i risultati quotidiani, senza perdere di vista nessuno.</p><button class="primary" data-nav="daily">Apri registro giornaliero <span>→</span></button></div><div class="hero-number"><span>RETE</span><strong>13</strong><small>uffici postali</small></div></section>
-<div class="stats"><div class="stat"><span>Uffici</span><strong>${db.offices.length}</strong><small>Sedi della rete</small></div><div class="stat"><span>Collaboratori</span><strong>${db.people.length}</strong><small>Persone inserite</small></div><div class="stat"><span>Obiettivi assegnati</span><strong>${gs.length}</strong><small>${peopleWithGoals} persone coinvolte</small></div><div class="stat"><span>Obiettivi sotto ritmo</span><strong>${below}</strong><small>Atteso: ${Math.round(q*100)}% del mese</small></div></div>
-<div class="two-cols"><section class="panel"><div class="panel-head"><h3>Andamento per ufficio</h3><button class="link" data-nav="offices">Tutti gli uffici →</button></div>${ofs.map(({o,score,count})=>`<button class="office-line" data-action="jumpOffice" data-id="${esc(o.id)}"><div><b>${esc(o.name)}</b><small>${count} collaboratori</small></div>${pBar(score)}<strong>${Math.round(score)}%</strong></button>`).join("")}</section><section class="panel"><div class="panel-head"><h3>Da tenere d'occhio</h3><span class="subtle">Rispetto al ritmo atteso</span></div>${!gs.length?`<div class="empty"><div>◎</div><b>Inizia assegnando gli obiettivi</b><p>Configura i collaboratori e poi i target del mese.</p><button class="primary" data-nav="people">Aggiungi collaboratori</button></div>`:gs.sort((a,b)=>pct(a)-pct(b)).slice(0,8).map(g=>`<div class="attention"><div class="initials">${esc((person(g.personId)?.name||"?").slice(0,2).toUpperCase())}</div><div><b>${esc(person(g.personId)?.name)}</b><small>${esc(g.name)} · ${esc(office(person(g.personId)?.officeId)?.name)}</small></div><strong>${Math.round(pct(g))}%</strong></div>`).join("")}<p class="note">Il ritmo atteso considera lunedì–sabato, senza festività e assenze. Personalizzabile nelle versioni successive.</p></section></div>`;
+ const gs=db.goals.filter(g=>g.month===ui.month), q=expected(ui.month);
+ const peopleWithGoals=new Set(gs.filter(g=>scopeOf(g)==="person").map(g=>g.personId)).size;
+ const below=gs.filter(g=>pct(g)<q*100).length;
+ const ofs=db.offices.map(o=>({o,score:avgOffice(o),count:db.people.filter(p=>p.officeId===o.id).length,goals:officeGoals(o.id).length}));
+ const officeCount=gs.filter(g=>scopeOf(g)==="office").length;
+ const kpis=kpiOptions(), selected=kpis.some(k=>k.key===ui.kpi)?ui.kpi:kpis[0]?.key;
+ const rank=selected?leaderData(selected):null;
+ return `<section class="hero"><div><div class="hero-tag">GEOPOSTALE • QUADRO MENSILE</div><h2>Ogni ufficio.<br><em>Ogni contributo conta.</em></h2><p>Obiettivi di sede, risultati individuali e confronto tra tutti i 13 uffici.</p><button class="primary" data-nav="daily">Apri registro giornaliero <span>→</span></button></div><div class="hero-number"><span>RETE</span><strong>${db.offices.length}</strong><small>uffici postali</small></div></section>
+ <div class="stats"><div class="stat"><span>Uffici</span><strong>${db.offices.length}</strong><small>Sedi della rete</small></div><div class="stat"><span>Collaboratori</span><strong>${db.people.length}</strong><small>${peopleWithGoals} con obiettivi individuali</small></div><div class="stat"><span>Obiettivi ufficio</span><strong>${officeCount}</strong><small>${gs.length-officeCount} obiettivi individuali</small></div><div class="stat"><span>Obiettivi sotto ritmo</span><strong>${below}</strong><small>Atteso: ${Math.round(q*100)}% del mese</small></div></div>
+ <div class="two-cols"><section class="panel"><div class="panel-head"><h3>Andamento per ufficio</h3><button class="link" data-nav="offices">Tutti gli uffici →</button></div>${ofs.map(({o,score,count,goals})=>`<button class="office-line" data-action="jumpOffice" data-id="${esc(o.id)}"><div><b>${esc(o.name)}</b><small>${count} collaboratori · ${goals} target di sede</small></div>${pBar(score)}<strong>${Math.round(score)}%</strong></button>`).join("")}</section>
+ <section class="panel"><div class="panel-head"><h3>Contributi dei collaboratori</h3><button class="link" data-nav="ranking">Classifiche →</button></div>${!rank?`<div class="empty"><div>★</div><b>Assegna un obiettivo d'ufficio</b><p>Comparirà qui la classifica dei contributi registrati dai collaboratori.</p><button class="primary" data-action="goalOffice">+ Obiettivo ufficio</button></div>`:`<p class="subtle">${esc(kpis.find(k=>k.key===selected)?.label)}</p>${rank.members.slice(0,6).map((p,i)=>`<div class="attention"><div class="initials">${i+1}°</div><div><b>${esc(p.name)}</b><small>${esc(office(p.officeId)?.name)}</small></div><strong>${fmt(p.result)}</strong></div>`).join("")}<button class="text-button" data-nav="ranking">Apri classifica completa →</button>`}</section></div>`;
 }
-function officesPage(){return `<div class="section-title"><div><h2>La tua rete</h2><p>Rinomina i 13 uffici secondo la tua struttura.</p></div></div><div class="grid-cards">${db.offices.map((o,i)=>`<article class="tile"><div class="tile-top"><span class="office-num">${pad(i+1)}</span><button class="icon-button" data-action="editOffice" data-id="${esc(o.id)}" aria-label="Modifica ufficio">✎</button></div><h3>${esc(o.name)}</h3><p>${db.people.filter(p=>p.officeId===o.id).length} collaboratori · ${db.goals.filter(g=>g.month===ui.month&&person(g.personId)?.officeId===o.id).length} obiettivi</p>${pBar(avgOffice(o))}<div class="tile-bottom"><span>Avanzamento medio</span><b>${Math.round(avgOffice(o))}%</b></div><button class="text-button" data-action="jumpOffice" data-id="${esc(o.id)}">Apri registro →</button></article>`).join("")}</div>`;}
+function officesPage(){return `<div class="section-title"><div><h2>La tua rete</h2><p>Rinomina i 13 uffici secondo la tua struttura.</p></div></div><div class="grid-cards">${db.offices.map((o,i)=>`<article class="tile"><div class="tile-top"><span class="office-num">${pad(i+1)}</span><button class="icon-button" data-action="editOffice" data-id="${esc(o.id)}" aria-label="Modifica ufficio">✎</button></div><h3>${esc(o.name)}</h3><p>${db.people.filter(p=>p.officeId===o.id).length} collaboratori · ${db.goals.filter(g=>g.month===ui.month&&officeForGoal(g)===o.id).length} obiettivi</p>${pBar(avgOffice(o))}<div class="tile-bottom"><span>Avanzamento medio</span><b>${Math.round(avgOffice(o))}%</b></div><button class="text-button" data-action="jumpOffice" data-id="${esc(o.id)}">Apri registro →</button> <button class="text-button" data-action="goalOffice" data-id="${esc(o.id)}">+ Obiettivo ufficio</button></article>`).join("")}</div>`;}
 function peoplePage(){
 const ps=db.people.filter(p=>ui.office==="all"||p.officeId===ui.office);
 return `<div class="section-title"><div><h2>Collaboratori</h2><p>Sportello, OFE, DUP, consulenti finanziari, consulente mobile e ruoli personalizzati.</p></div><button class="primary" data-action="person">+ Aggiungi persona</button></div><div class="filters"><label>Filtra ufficio<select id="officeFilter"><option value="all">Tutti gli uffici</option>${selectOpts(db.offices,ui.office)}</select></label><button class="secondary" data-nav="settings">⚙ Gestisci ruoli</button></div>${!ps.length?`<div class="empty"><div>♙</div><b>Nessun collaboratore inserito</b><p>Aggiungi il primo collaboratore per assegnargli un obiettivo.</p></div>`:`<div class="grid-cards">${ps.map(p=>`<article class="tile person-tile"><div class="tile-top"><div class="initials large">${esc(p.name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase())}</div><div><button class="icon-button" data-action="person" data-id="${esc(p.id)}" title="Modifica">✎</button><button class="icon-button" data-action="deletePerson" data-id="${esc(p.id)}" title="Elimina">×</button></div></div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><span class="tag">${esc(office(p.officeId)?.name)}</span><div class="tile-bottom"><span>Obiettivi nel mese</span><b>${ownGoals(p.id).length}</b></div><button class="text-button" data-action="goal" data-person="${esc(p.id)}">+ Assegna obiettivo →</button></article>`).join("")}</div>`}`;}
 function goalsPage(){
-let gs=db.goals.filter(g=>g.month===ui.month&&(ui.office==="all"||person(g.personId)?.officeId===ui.office));
-return `<div class="section-title"><div><h2>Obiettivi del mese</h2><p>Target individuali commerciali e gestionali, con consuntivo aggiornato.</p></div><button class="primary" data-action="goal">+ Nuovo obiettivo</button></div><div class="filters"><label>Ufficio<select id="officeFilter"><option value="all">Tutti gli uffici</option>${selectOpts(db.offices,ui.office)}</select></label><button class="secondary" data-action="copyGoals">Copia dal mese precedente</button><button class="secondary" data-nav="settings">⚙ Gestisci categorie</button></div>${!gs.length?`<div class="empty"><div>◎</div><b>Nessun obiettivo per ${esc(dateTitle(ui.month))}</b><p>Assegna obiettivi individuali ai collaboratori per questo mese.</p></div>`:`<div class="goal-grid">${gs.map(g=>{let p=person(g.personId);return `<article class="goal-card"><div class="goal-head"><span class="tag ${g.category==="Gestionale"?"light":""}">${esc(g.category)}</span><div><button class="icon-button" data-action="goal" data-id="${esc(g.id)}" title="Modifica">✎</button><button class="icon-button" data-action="deleteGoal" data-id="${esc(g.id)}" title="Elimina">×</button></div></div><h3>${esc(g.name)}</h3><p>${esc(p?.name)} · ${esc(office(p?.officeId)?.name)}</p><div class="goal-numbers"><span><small>Raggiunto</small><strong>${pretty(g,val(g))}</strong></span><span><small>Target</small><strong>${pretty(g,g.target)}</strong></span></div>${pBar(pct(g))}<div class="tile-bottom"><span>Avanzamento</span><b>${Math.round(pct(g))}%</b></div></article>`}).join("")}</div>`}`;}
+ const gs=db.goals.filter(g=>g.month===ui.month&&(ui.office==="all"||officeForGoal(g)===ui.office));
+ const officeCount=gs.filter(g=>scopeOf(g)==="office").length;
+ return `<div class="section-title"><div><h2>Obiettivi del mese</h2><p>Assegna target all'ufficio oppure al singolo collaboratore. I risultati di sede possono essere attribuiti alle persone.</p></div><div class="action-row"><button class="primary" data-action="goalOffice">+ Obiettivo ufficio</button><button class="secondary" data-action="goalPerson">+ Obiettivo persona</button></div></div>
+ <div class="filters"><label>Ufficio<select id="officeFilter"><option value="all">Tutti gli uffici</option>${selectOpts(db.offices,ui.office)}</select></label><button class="secondary" data-action="copyGoals">Copia dal mese precedente</button><button class="secondary" data-nav="settings">⚙ Gestisci categorie</button></div>
+ <p class="subtle" style="margin-bottom:12px">${officeCount} obiettivi di ufficio · ${gs.length-officeCount} obiettivi individuali</p>
+ ${!gs.length?`<div class="empty"><div>◎</div><b>Nessun obiettivo per ${esc(dateTitle(ui.month))}</b><p>Puoi iniziare creando un target per uno dei 13 uffici, anche senza collaboratori.</p><button class="primary" data-action="goalOffice">Crea obiettivo ufficio</button></div>`:`<div class="goal-grid">${gs.map(g=>`<article class="goal-card"><div class="goal-head"><span class="tag ${scopeOf(g)==="office"?"light":""}">${scopeOf(g)==="office"?"Ufficio":"Individuale"} · ${esc(g.category)}</span><div><button class="icon-button" data-action="goal" data-id="${esc(g.id)}" title="Modifica">✎</button><button class="icon-button" data-action="deleteGoal" data-id="${esc(g.id)}" title="Elimina">×</button></div></div><h3>${esc(g.name)}</h3><p>${esc(goalLabel(g))}</p><div class="goal-numbers"><span><small>Raggiunto</small><strong>${pretty(g,val(g))}</strong></span><span><small>Target mensile</small><strong>${pretty(g,g.target)}</strong></span></div>${pBar(pct(g))}<div class="tile-bottom"><span>Avanzamento</span><b>${Math.round(pct(g))}%</b></div>${scopeOf(g)==="office"?`<button class="text-button" data-action="jumpOffice" data-id="${esc(g.officeId)}">Inserisci contributi →</button>`:""}</article>`).join("")}</div>`}
+ `;
+}
 function dailyPage(){
-const oid=ui.office==="all"?db.offices[0]?.id:ui.office;
-if(!oid)return `<div class="empty">Nessun ufficio</div>`;
-const ps=db.people.filter(p=>p.officeId===oid);
-const date=ui.date.startsWith(ui.month)?ui.date:ui.month+"-01";
-let total=0;
-const cards=ps.map(p=>{const gs=ownGoals(p.id);if(!gs.length)return "";total+=gs.length;return `<div class="register-person"><div class="register-header"><span class="initials">${esc(p.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.role)}</small></div></div>${gs.map(g=>{const e=db.entries.find(e=>e.goalId===g.id&&e.date===date);return `<label class="register-row"><span><b>${esc(g.name)}</b><small>${esc(g.category)} · mese ${pretty(g,val(g))} / ${pretty(g,g.target)}</small></span><div class="value-input"><input type="number" min="0" step="any" inputmode="decimal" name="goal_${esc(g.id)}" data-goal="${esc(g.id)}" placeholder="—" ${e?`value="${esc(e.value)}"`:""}><i>${esc(g.unit)}</i></div></label>`;}).join("")}</div>`;}).filter(Boolean).join("");
-return `<div class="section-title"><div><h2>Registro rapido</h2><p>Compila più risultati e salva una sola volta. Ogni valore è riferito al giorno selezionato.</p></div></div><form id="dailyForm"><div class="filters two"><label>Ufficio<select id="dailyOffice">${selectOpts(db.offices,oid)}</select></label><label>Giorno<input id="dailyDate" type="date" value="${esc(date)}"></label></div><div class="info-line">✓ Lascia vuoto per non modificare · Scrivi <b>0</b> per registrare zero · Un valore già presente può essere corretto.</div>${!total?`<div class="empty"><div>✎</div><b>Nessun obiettivo da compilare</b><p>Inserisci i collaboratori e assegna loro obiettivi per ${esc(dateTitle(ui.month))}.</p><button type="button" class="primary" data-nav="goals">Vai agli obiettivi</button></div>`:cards+`<div class="sticky-save"><div><b>${total} indicatori disponibili</b><small>${esc(office(oid)?.name)} · ${shortDate(date)}</small></div><button class="primary" type="submit">Salva giornata ✓</button></div>`}</form>`;}
+ const oid=ui.office==="all"?db.offices[0]?.id:ui.office;
+ if(!oid)return `<div class="empty">Nessun ufficio</div>`;
+ const ps=db.people.filter(p=>p.officeId===oid);
+ const date=ui.date.startsWith(ui.month)?ui.date:ui.month+"-01";
+ const og=officeGoals(oid),sumOG=og.filter(g=>g.mode!=="latest");
+ let total=0;
+ const row=(g,pid)=>{
+   const e=scopeOf(g)==="office"?officeEntry(g,date,pid):db.entries.find(x=>x.goalId===g.id&&x.date===date);
+   total++;
+   return `<label class="register-row"><span><b>${esc(g.name)} ${scopeOf(g)==="office"?"· UFFICIO":""}</b><small>${esc(g.category)} · totale mese ${pretty(g,val(g))} / ${pretty(g,g.target)}</small></span><div class="value-input"><input type="number" min="0" step="any" inputmode="decimal" name="entry_${esc(g.id)}_${esc(pid||"office")}" data-goal="${esc(g.id)}" data-person="${esc(pid||"")}" placeholder="—" ${e?`value="${esc(e.value)}"`:""}><i>${esc(g.unit)}</i></div></label>`;
+ };
+ const cards=ps.map(p=>{
+    const gs=[...ownGoals(p.id),...sumOG];
+    if(!gs.length)return "";
+    return `<div class="register-person"><div class="register-header"><span class="initials">${esc(p.name.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase())}</span><div><b>${esc(p.name)}</b><small>${esc(p.role)} · obiettivi individuali e contributi di sede</small></div></div>${gs.map(g=>row(g,scopeOf(g)==="office"?p.id:"")).join("")}</div>`;
+ }).filter(Boolean).join("");
+ const officeRows=og.map(g=>row(g,"")).join("");
+ return `<div class="section-title"><div><h2>Registro rapido</h2><p>Registra quanto ha prodotto ciascuna persona per gli obiettivi dell'ufficio, insieme ai suoi eventuali obiettivi individuali.</p></div></div>
+ <form id="dailyForm"><div class="filters two"><label>Ufficio<select id="dailyOffice">${selectOpts(db.offices,oid)}</select></label><label>Giorno<input id="dailyDate" type="date" value="${esc(date)}"></label></div>
+ <div class="info-line">I contributi personali alimentano automaticamente il totale dell'obiettivo di ufficio, senza duplicazioni. Scrivi <b>0</b> per registrare zero; lascia vuoto per non modificare.</div>
+ ${!total?`<div class="empty"><div>✎</div><b>Nessun indicatore disponibile</b><p>Crea un obiettivo di ufficio o individuale per questo mese.</p><button type="button" class="primary" data-action="goalOffice">+ Obiettivo ufficio</button></div>`:
+ cards+`<div class="register-person"><div class="register-header"><span class="initials">▣</span><div><b>Risultati riferiti solo all'ufficio</b><small>Da usare per valori non attribuiti a un singolo collaboratore. Per le percentuali viene registrato l'ultimo valore.</small></div></div>${officeRows}</div>`+
+ `<div class="sticky-save"><div><b>${total} campi disponibili</b><small>${esc(office(oid)?.name)} · ${shortDate(date)}</small></div><button class="primary" type="submit">Salva giornata ✓</button></div>`}</form>`;
+}
 function historyPage(){
-const es=db.entries.filter(e=>e.date.startsWith(ui.month)&&(ui.office==="all"||person(db.goals.find(g=>g.id===e.goalId)?.personId)?.officeId===ui.office)).sort((a,b)=>b.date.localeCompare(a.date));
-return `<div class="section-title"><div><h2>Storico rilevazioni</h2><p>Consulta i risultati del mese, correggili dal registro o elimina una rilevazione.</p></div><button class="secondary" data-action="csvEntries">Esporta CSV ↓</button></div><div class="filters"><label>Ufficio<select id="officeFilter"><option value="all">Tutti gli uffici</option>${selectOpts(db.offices,ui.office)}</select></label></div>${!es.length?`<div class="empty">Nessuna rilevazione per questo mese.</div>`:`<div class="history-list">${es.map(e=>{const g=db.goals.find(g=>g.id===e.goalId),p=g&&person(g.personId);return `<div class="history-row"><div><b>${shortDate(e.date)}</b><small>${esc(p?.name)} · ${esc(office(p?.officeId)?.name)}</small><div>${esc(g?.name)}</div></div><strong>${g?pretty(g,e.value):fmt(e.value)}</strong><button class="icon-button" title="Elimina rilevazione" data-action="deleteEntry" data-id="${esc(e.id)}">×</button></div>`;}).join("")}</div>`}`;}
+ const es=db.entries.filter(e=>{
+   const g=db.goals.find(g=>g.id===e.goalId);
+   return e.date.startsWith(ui.month)&&g&&(ui.office==="all"||officeForGoal(g)===ui.office);
+ }).sort((a,b)=>b.date.localeCompare(a.date));
+ return `<div class="section-title"><div><h2>Storico rilevazioni</h2><p>Ogni risultato indica l'ufficio e, quando disponibile, il collaboratore che ha contribuito.</p></div><button class="secondary" data-action="csvEntries">Esporta CSV ↓</button></div>
+ <div class="filters"><label>Ufficio<select id="officeFilter"><option value="all">Tutti gli uffici</option>${selectOpts(db.offices,ui.office)}</select></label></div>
+ ${!es.length?`<div class="empty">Nessuna rilevazione per questo mese.</div>`:`<div class="history-list">${es.map(e=>{
+ const g=db.goals.find(g=>g.id===e.goalId);
+ return `<div class="history-row"><div><b>${shortDate(e.date)}</b><small>${esc(entryPerson(e))} · ${esc(goalLocation(g))}</small><div>${esc(g.name)} · ${scopeOf(g)==="office"?"Ufficio":"Individuale"}</div></div><strong>${pretty(g,e.value)}</strong><button class="icon-button" title="Elimina rilevazione" data-action="deleteEntry" data-id="${esc(e.id)}">×</button></div>`;
+ }).join("")}</div>`}`;
+}
+function rankingPage(){
+ const opts=kpiOptions(),selected=opts.some(x=>x.key===ui.kpi)?ui.kpi:opts[0]?.key||"";
+ const data=selected?leaderData(selected,ui.office):null;
+ const choice=opts.find(x=>x.key===selected);
+ return `<div class="section-title"><div><h2>Classifiche GeoPostale</h2><p>Confronta i contributi dei collaboratori per uno stesso indicatore e verifica i risultati dei singoli uffici.</p></div><button class="secondary" data-action="csvContributions">Esporta classifica CSV ↓</button></div>
+ ${!opts.length?`<div class="empty"><div>★</div><b>Nessun indicatore di ufficio disponibile</b><p>Assegna almeno un obiettivo a un ufficio e registra i contributi per costruire le classifiche.</p><button class="primary" data-action="goalOffice">+ Nuovo obiettivo di ufficio</button></div>`:
+ `<div class="filters two"><label>Indicatore<select id="kpiFilter">${opts.map(o=>`<option value="${esc(o.key)}" ${o.key===selected?"selected":""}>${esc(o.label)}</option>`).join("")}</select></label><label>Ambito<select id="officeFilter"><option value="all">Tutto il GeoPostale</option>${selectOpts(db.offices,ui.office)}</select></label></div>
+ <div class="stats"><div class="stat"><span>Target aggregato</span><strong>${fmt(data.target)}</strong><small>${esc(choice.unit)}</small></div><div class="stat"><span>Totale raggiunto</span><strong>${fmt(data.total)}</strong><small>${Math.round(data.target?data.total/data.target*100:0)}% del target</small></div><div class="stat"><span>Contributi attribuiti</span><strong>${fmt(data.members.reduce((s,p)=>s+p.result,0))}</strong><small>${data.members.length} collaboratori</small></div><div class="stat"><span>Non attribuiti</span><strong>${fmt(data.unassigned)}</strong><small>Inserimenti riferiti solo all'ufficio</small></div></div>
+ <div class="two-cols"><section class="panel"><div class="panel-head"><h3>Classifica collaboratori</h3><span class="subtle">${esc(choice.name)}</span></div>
+ ${!data.members.length?`<div class="empty">Aggiungi collaboratori agli uffici per vedere la classifica.</div>`:data.members.map((p,i)=>`<div class="leader-row"><span class="leader-num">${i+1}</span><div class="leader-name"><b>${esc(p.name)}</b><small>${esc(office(p.officeId)?.name)} · ${esc(p.role)}</small></div><div class="leader-score"><strong>${fmt(p.result)}</strong><small>${esc(choice.unit)}</small></div></div>`).join("")}
+ </section><section class="panel"><div class="panel-head"><h3>Uffici a confronto</h3><span class="subtle">Stesso indicatore</span></div>
+ ${data.gs.slice().sort((a,b)=>pct(b)-pct(a)).map(g=>`<button class="office-line" data-action="jumpOffice" data-id="${esc(g.officeId)}"><div><b>${esc(goalLocation(g))}</b><small>${pretty(g,val(g))} / ${pretty(g,g.target)}</small></div>${pBar(pct(g))}<strong>${Math.round(pct(g))}%</strong></button>`).join("")}</section></div>
+ <p class="note">Le classifiche confrontano soltanto lo stesso indicatore (nome, categoria, unità e modalità di calcolo). Le cifre di natura diversa non vengono sommate. I collaboratori senza risultati compaiono con zero. Le prestazioni vanno lette alla luce di presenze, incarichi e opportunità effettive.</p>`}`;
+}
 function catalogSection(){
   const list=(key)=>`<div class="catalog-group"><div class="catalog-group-top"><div><h3>${esc(catalogLabels[key])}</h3><p>${key==="roles"?"Modifica i ruoli disponibili nelle schede dei collaboratori.":key==="categories"?"Personalizza le categorie associate agli obiettivi.":"Aggiungi o modifica le unità usate nei target."}</p></div><button type="button" class="secondary" data-action="catalogAdd" data-cat="${key}">+ Aggiungi</button></div><div class="catalog-items">${db.catalogs[key].map(value=>`<div class="catalog-row"><span><b>${esc(value)}</b><small>${catalogUsage(key,value)} ${key==="roles"?"collaboratori":"obiettivi"} collegati</small></span><div class="catalog-actions"><button class="icon-button" type="button" title="Rinomina voce" aria-label="Rinomina ${esc(value)}" data-action="catalogRename" data-cat="${key}" data-value="${esc(value)}">✎</button><button class="icon-button" type="button" title="Elimina voce" aria-label="Elimina ${esc(value)}" data-action="catalogRemove" data-cat="${key}" data-value="${esc(value)}">×</button></div></div>`).join("")}</div></div>`;
   return `<div class="catalog-management"><div><h2>Personalizza le categorie</h2><p>Aggiungi, rinomina o elimina le voci dei menu senza perdere le assegnazioni. Le rinomine si applicano automaticamente anche ai dati esistenti.</p></div>${["roles","categories","units"].map(list).join("")}</div>`;
