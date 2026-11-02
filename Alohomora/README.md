@@ -1,8 +1,13 @@
-# Alohomora — The Living Highlands 1.2
+# Alohomora — The Living Highlands 1.2.1
 
 Fan-made, unofficial fantasy adventure playable in Safari on iPhone and in desktop browsers. The project is **not** affiliated with Warner Bros., J. K. Rowling or the Harry Potter franchise.
 
 **Play:** https://sickbado.github.io/Alohomora/
+
+## Fix in v1.2.1 (2 November 2026)
+
+- Fixed the minimap redraw transform: the player marker and the terrain remain correctly positioned after extended play on Safari/iPhone and desktop browsers.
+- Added a repeat-redraw regression check to the project's smoke test.
 
 ## New in v1.2
 
