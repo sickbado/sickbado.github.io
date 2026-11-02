@@ -1,4 +1,4 @@
-/* ALOHOMORA · REBORN 1.2 — The Living Highlands, Chapter I — mobile 3D vertical slice.
+/* ALOHOMORA · REBORN 1.2.1 — The Living Highlands, Chapter I — mobile 3D vertical slice.
  * Rendering: Babylon.js, animations: GLB (optional) + procedural fallback.
  * Character source: three.js examples Soldier.glb (MIT sample). Geometry/textures
  * created here are original; 3D asset is optional and loaded separately.
@@ -393,13 +393,14 @@
     world.zoneTick+=dt;if(world.zoneTick>.22){world.zoneTick=0;drawMinimap();updateWorldHUD();}
   }
   function drawMinimap(){const canvas=$('minimap');if(!canvas)return;const g=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    g.setTransform(1,0,0,1,0,0); // Reset persistent Canvas 2D state before every redraw.
     g.clearRect(0,0,w,h);g.fillStyle='rgba(13,19,27,.78)';g.fillRect(0,0,w,h);
     const px=cam.position.x,pz=cam.position.z,scale=.43;const project=(x,z)=>[w/2+(x-px)*scale,h/2+(z-pz)*scale];
     g.strokeStyle='#a68f6b45';g.lineWidth=2;g.beginPath();let chain=[[0,50],[67,55],[104,30],[127,81],[141,123]];
     for(let j=0;j<chain.length;j++){const [x,y]=project(...chain[j]);if(j===0)g.moveTo(x,y);else g.lineTo(x,y)}g.stroke();
     for(const m of landmarks){const [x,y]=project(m.x,m.z);if(x<0||x>w||y<0||y>h)continue;g.fillStyle='#b8b4a0';g.beginPath();g.arc(x,y,3.6,0,6.283);g.fill();}
     for(const a of world.actors)if(a.alive){const [x,y]=project(a.x,a.z);if(x<2||x>w-2||y<2||y>h-2)continue;g.fillStyle=a.kind==='shade'?'#b84e5b':'#8eb1b2';g.fillRect(x-1.6,y-1.6,3.2,3.2);}
-    g.translate(w/2,h/2);g.rotate(-game.yaw);g.fillStyle='#edd3a2';g.beginPath();g.moveTo(0,-8);g.lineTo(5,6);g.lineTo(0,3);g.lineTo(-5,6);g.closePath();g.fill();
+    g.save();g.translate(w/2,h/2);g.rotate(-game.yaw);g.fillStyle='#edd3a2';g.beginPath();g.moveTo(0,-8);g.lineTo(5,6);g.lineTo(0,3);g.lineTo(-5,6);g.closePath();g.fill();g.restore();
   }
   function updateWorldHUD(){const clock=$('worldTime');if(clock){let minutes=Math.floor(world.time*1440);clock.textContent=String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0')+' · '+(world.time<.25||world.time>.79?'NOTTE':world.time>.68?'TRAMONTO':'GIORNO')+(world.weather==='pioggia'?' · PIOGGIA':'');}
     const a=nearestActor();const nearTrain=world.train&&distance(cam.position.x,cam.position.z,145,world.train.z)<8&&Math.abs(cam.position.z-world.train.z)<32;
@@ -646,7 +647,7 @@
     document.addEventListener('contextmenu',e=>e.preventDefault());
   }
   async function checkForUpdate(){try{const r=await fetch('./version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
-    const v=await r.json();if(v.version&&v.version!=='1.2.0'){
+    const v=await r.json();if(v.version&&v.version!=='1.2.1'){
       const btn=$('updateBanner');if(btn){btn.classList.remove('hidden');btn.textContent='✦ Nuovo Alohomora '+v.version+' disponibile · Tocca per aggiornare';}
     }}catch(e){}}
   function boot(){if(!B){error('Impossibile caricare Babylon.js. Verifica la connessione Internet e ricarica.');return;}
