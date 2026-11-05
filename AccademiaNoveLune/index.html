@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="theme-color" content="#151a32" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Nove Lune" />
+<meta name="description" content="Accademia delle Nove Lune: una piccola avventura magica in pixel art, giocabile da smartphone." />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<title>Accademia delle Nove Lune · Il Risveglio</title>
+<style>
+:root { color-scheme:dark; --ink:#111325; --panel:#22213b; --edge:#9770a5; --gold:#f7d284; --white:#fff6df; --muted:#c6bdd5; --violet:#8863ca; }
+* {box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body {margin:0;width:100%;height:100%;overflow:hidden;background:#101324;color:var(--white);font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overscroll-behavior:none;touch-action:none}
+button {font:inherit;cursor:pointer;touch-action:manipulation}
+#game {position:fixed;inset:0;overflow:hidden;background:#122036}
+canvas {position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#vignette {position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 45%,transparent 53%,rgba(12,10,28,.40) 100%)}
+#game:after {content:'';position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 2px rgba(249,209,137,.12)}
+.hud {position:absolute;z-index:2;pointer-events:none}
+#topHud {top:max(10px,env(safe-area-inset-top));left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.placard {border:2px solid #bd97a8;background:linear-gradient(135deg,#191a33ed,#302444e9);box-shadow:0 3px 0 #0c0e1e,0 5px 16px #07091a91;border-radius:10px;padding:7px 11px;min-width:0;backdrop-filter:blur(5px)}
+#location {font-size:12px;font-weight:900;letter-spacing:.02em;color:#ffe7ab;text-shadow:0 1px #09091e}
+#questTitle {font-size:11px;font-weight:750;margin-top:3px;white-space:normal;color:#fff8ed;max-width:360px}
+#questHint {font-size:10px;color:#cfbfd8;margin-top:3px;max-width:360px}
+#status {display:flex;gap:7px;align-items:center;flex-shrink:0}
+#manaPanel {min-width:104px;display:flex;gap:8px;align-items:center;color:#9dc7ff;font-weight:800;font-size:12px}
+.manaTrack {background:#10152a;border:1px solid #a999cc;width:70px;height:10px;border-radius:5px;overflow:hidden;box-shadow:0 1px 0 #060b14 inset}
+#manaFill {height:100%;width:100%;background:linear-gradient(90deg,#408def,#8ff2ff);transition:width .2s}
+.hudIcon {pointer-events:auto;min-width:38px;height:38px;display:grid;place-items:center;border-radius:10px;border:2px solid #b393ae;color:#fff1cf;background:#241d3cdd;box-shadow:0 3px #0b0e1e;font-size:19px}
+.hudIcon:active,.actionButton:active {transform:translateY(2px);box-shadow:0 1px #080912}
+#objective {position:absolute;z-index:2;top:86px;left:12px;display:flex;gap:6px;pointer-events:none}
+#objective span {display:inline-block;font-size:9px;font-weight:800;color:#f2dfb2;padding:4px 7px;background:#29243ecb;border:1px solid #c69a7d;border-radius:5px}
+#bottomControls {position:absolute;z-index:4;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:flex-end;justify-content:space-between;padding:0 max(17px,env(safe-area-inset-left)) 0 max(17px,env(safe-area-inset-right));pointer-events:none;gap:10px}
+#joystick {width:130px;height:130px;flex:0 0 130px;border-radius:50%;position:relative;pointer-events:auto;background:radial-gradient(circle at center,#2c344770 0 24%,#17223dbd 24% 48%,#15172db9 49% 66%,#8975a17a 66% 69%,#121a2fa8 70%);border:2px solid #c0a5b37a;box-shadow:0 7px 22px #070f27a3;touch-action:none}
+#joystick:before {content:'✧';position:absolute;inset:0;display:grid;place-items:center;color:#f6ddb968;font-size:54px}
+#stick {position:absolute;top:50%;left:50%;width:57px;height:57px;margin:-28.5px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(135deg,#d4bfc8,#726da1 50%,#3a3667);border:3px solid #f1cba5;box-shadow:0 4px 0 #27203a,0 0 18px #e7c6fe50;transform:translate(0,0)}
+#stick:after {content:'✦';font-size:27px;color:#fff0ce;text-shadow:0 2px #2c2e60}
+#rightControls {display:grid;grid-template-columns:58px 102px;grid-template-rows:repeat(2,58px);gap:9px;align-items:center;pointer-events:auto}
+.actionButton {border:3px solid #e8c5ad;border-radius:50%;color:#ffedbb;background:linear-gradient(145deg,#5a3f7e,#241c4b);box-shadow:0 4px #19132b,0 0 10px #1b1749c2;font-size:24px;font-weight:850;display:grid;place-items:center;position:relative;user-select:none;touch-action:none}
+#cast {grid-row:1/3;grid-column:2;width:100px;height:100px;align-self:center;font-size:36px;background:radial-gradient(circle at 35% 30%,#8b52c9,#45236b 70%);border-color:#ffdaa3;box-shadow:0 5px #211033,0 0 12px #a959e7a8}
+#cast:active {transform:translateY(2px)}
+#interact {grid-row:1;grid-column:1;width:58px;height:58px}
+#switchSpell {grid-row:2;grid-column:1;width:58px;height:58px;font-size:20px}
+.actionLabel {position:absolute;bottom:-8px;background:#1d1934eb;border:1px solid #8b79a0;border-radius:5px;padding:1px 4px;font-size:8px;white-space:nowrap;font-weight:800;color:#fff3cf}
+#prompt {position:absolute;z-index:3;left:50%;bottom:149px;transform:translateX(-50%);min-width:min(380px,88vw);max-width:min(500px,88vw);text-align:center;pointer-events:none;background:#16162ddf;border:2px solid #c2a5be;border-radius:8px;box-shadow:0 3px #080a17;padding:7px 11px;color:#ffe9ba;font-size:11px;font-weight:800;opacity:0;transition:opacity .12s}
+#prompt.visible {opacity:1}
+#toast {position:absolute;z-index:8;left:50%;top:24%;transform:translate(-50%,-10px);max-width:83vw;pointer-events:none;opacity:0;background:#211b39f2;border:2px solid #f1c985;border-radius:10px;padding:10px 16px;text-align:center;color:#ffe8ae;font-weight:850;font-size:12px;box-shadow:0 5px 16px #06081888;transition:opacity .15s,transform .15s}
+#toast.visible {opacity:1;transform:translate(-50%,0)}
+.overlay {position:absolute;z-index:10;inset:0;display:flex;justify-content:center;align-items:center;padding:22px max(16px,env(safe-area-inset-left));background:rgba(10,11,27,.78);backdrop-filter:blur(7px);overflow:auto;touch-action:pan-y}
+#startOverlay {background:linear-gradient(180deg,rgba(10,11,27,.46),rgba(10,11,27,.89)),radial-gradient(circle at 48% 32%,#594b85,#17162b) center center / cover no-repeat}
+.overlay.hidden {display:none}
+.panel {position:relative;max-width:600px;width:100%;background:linear-gradient(155deg,#343052,#1b1c35 75%);border:3px solid #d7a979;outline:2px solid #30223f;outline-offset:3px;border-radius:15px;padding:23px;box-shadow:0 13px 50px #050613d1;text-align:center}
+.panel:before,.panel:after {content:'✦';color:#f6ce81;position:absolute;font-size:18px;top:6px}
+.panel:before {left:10px} .panel:after {right:10px}
+.panel h1 {font-family:Georgia,'Times New Roman',serif;line-height:1.08;font-size:clamp(29px,5.5vw,50px);color:#ffe0a2;text-shadow:0 3px #6d3663,0 6px 7px #090a23;margin:10px 0 15px}
+.panel h2 {font-family:Georgia,'Times New Roman',serif;color:#f8dea8;font-size:clamp(23px,3vw,31px);margin:6px 0 12px}
+.moonline {color:#ffc766;letter-spacing:8px;font-size:24px;text-shadow:0 0 9px #f3ba6799}
+.subtitle {font-size:11px;letter-spacing:2px;color:#d9c7ee;font-weight:900;text-transform:uppercase}
+.panel p {color:#ded6ea;font-size:14px;line-height:1.55;margin:10px auto;max-width:500px}
+.primary {background:linear-gradient(#ffdc91,#f1a955);border:2px solid #fff1c6;color:#39243a;box-shadow:0 4px #8f543c;padding:12px 18px;font-weight:950;letter-spacing:.03em;border-radius:9px;min-height:46px}
+.secondary {background:#352c51;color:#fce7b3;border:2px solid #9c88ac;box-shadow:0 3px #151227;padding:10px 16px;border-radius:9px;font-weight:800;min-height:42px}
+.primary:active,.secondary:active {transform:translateY(2px);box-shadow:0 1px #342240}
+.buttonRow {display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:16px 0 4px}
+.infoList {display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+.infoList span {font-size:11px;background:#12192c85;border:1px solid #796f9e;border-radius:6px;padding:5px 8px;color:#cdd3ef}
+.close {position:absolute;top:9px;right:9px;width:35px;height:35px;border:1px solid #ad9abd;background:#242139;color:#e8d9c6;border-radius:7px;font-size:20px;z-index:2}
+#startOverlay .panel {max-width:660px}
+#startOverlay .panel p {max-width:460px}
+#dialogue {position:absolute;z-index:7;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(660px,92vw);background:linear-gradient(130deg,#26213e,#171b36);border:3px solid #e3ba7f;box-shadow:0 5px 0 #0a0e20,0 0 30px #080c1bcc;border-radius:12px;padding:13px 16px 15px;display:none;touch-action:manipulation}
+#dialogue.visible {display:block}
+#dialogueName {color:#ffdc98;font-size:13px;font-weight:950;letter-spacing:.03em}
+#dialogueText {color:#f8f0e2;font-size:13px;line-height:1.5;margin-top:7px;padding-right:10px;min-height:42px}
+#dialogueActions {display:flex;justify-content:flex-end;margin-top:9px}
+#dialogueNext {padding:7px 15px;min-height:34px}
+#menuContent {text-align:left;max-height:63vh;overflow-y:auto;touch-action:pan-y}
+#menuContent h3 {color:#f6d39e;border-bottom:1px solid #675978;padding-bottom:5px;font-size:14px}
+#menuContent li {font-size:13px;color:#eadff2;margin:7px 0}
+#menuContent p {font-size:13px;text-align:left}
+.mapgrid {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.mapcell {padding:14px 5px;border:2px solid #6f6587;border-radius:8px;font-size:12px;background:#28243f;min-height:63px;display:grid;place-items:center}
+.mapcell.current {border-color:#f7d68f;color:#ffdf96;background:#423357}
+.kbd {font-family:monospace;border:1px solid #9f90ac;padding:1px 3px;border-radius:4px;color:#ffe4a0}
+#orientation {position:absolute;z-index:2;top:68px;right:12px;background:#171a30b7;border:1px solid #81749b;padding:4px 7px;border-radius:6px;font-size:9px;color:#e4cfdf;pointer-events:none;display:none}
+@media (orientation:portrait) { #orientation {display:block} #topHud {left:8px;right:8px;top:max(8px,env(safe-area-inset-top))} .placard {padding:6px 7px;max-width:65vw} #questTitle {font-size:10px} #questHint {font-size:9px} #location {font-size:10px} #status {gap:4px} #manaPanel {min-width:auto;font-size:9px;gap:4px} .manaTrack {width:45px;height:8px} .hudIcon {min-width:33px;height:33px;font-size:17px} #orientation {top:104px} #bottomControls {bottom:max(22px,env(safe-area-inset-bottom));padding:0 15px} #joystick {width:118px;height:118px;flex-basis:118px} #rightControls {grid-template-columns:52px 90px;grid-template-rows:repeat(2,52px);gap:7px} #interact,#switchSpell {width:52px;height:52px} #cast {width:90px;height:90px} #cast:active {transform:translateY(2px)} #prompt {bottom:165px;font-size:10px} .panel {padding:20px 15px} }
+@media (max-height:450px) and (orientation:landscape) {#topHud {top:6px} #joystick {width:100px;height:100px;flex-basis:100px} #bottomControls {bottom:7px} #rightControls {grid-template-columns:45px 80px;grid-template-rows:repeat(2,45px);gap:7px} #cast {width:80px;height:80px} #cast:active {transform:translateY(2px)} #interact,#switchSpell {width:45px;height:45px} .actionButton {font-size:19px} #prompt {bottom:113px} .placard {padding:5px 8px} #questHint {display:none} .hudIcon {height:34px;min-width:34px}}
+@media (prefers-reduced-motion:reduce) {*,*:before,*:after {transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="game">
+<canvas id="screen" aria-label="Mondo di gioco in Pixel Art"></canvas>
+<div id="vignette"></div>
+<div id="topHud" class="hud">
+  <div class="placard"><div id="location">☾ Accademia delle Nove Lune</div><div id="questTitle">La Campana Silenziosa</div><div id="questHint">Parla con la Maestra Seris</div></div>
+  <div id="status"><div class="placard" id="manaPanel">✦ <div class="manaTrack"><div id="manaFill"></div></div></div><button id="mapButton" class="hudIcon" aria-label="Apri mappa" title="Mappa">🗺️</button><button id="menuButton" class="hudIcon" aria-label="Apri menu" title="Diario e inventario">☰</button></div>
+</div>
+<div id="orientation">↻ In orizzontale il gioco è più panoramico</div>
+<div id="prompt"></div><div id="toast"></div>
+<div id="bottomControls"><div id="joystick" aria-label="Joystick movimento"><div id="stick"></div></div><div id="rightControls"><button id="interact" class="actionButton" aria-label="Interagisci">✋<span class="actionLabel">PARLA</span></button><button id="switchSpell" class="actionButton" aria-label="Cambia incantesimo">⇄<span class="actionLabel">CAMBIA</span></button><button id="cast" class="actionButton" aria-label="Lancia incantesimo">✦<span class="actionLabel" id="spellName">LUMA</span></button></div></div>
+<div id="dialogue" role="dialog" aria-label="Conversazione"><div id="dialogueName"></div><div id="dialogueText"></div><div id="dialogueActions"><button id="dialogueNext" class="primary">Continua ▸</button></div></div>
+<div id="startOverlay" class="overlay"><div class="panel"><div class="moonline">☾ ◐ ● ◑ ☽</div><div class="subtitle">RPG fantasy · Pixel Art · Demo 0.1</div><h1>Accademia delle<br>Nove Lune</h1><p>La grande campana ha smesso di suonare. Esplora l'accademia, apprendi le prime magie e risolvi il mistero del cristallo perduto.</p><div class="infoList"><span>🏰 4 ambienti</span><span>✨ 2 incantesimi</span><span>📜 1 missione completa</span><span>📱 Touch + tastiera</span></div><div class="buttonRow"><button id="startGame" class="primary">✦ Inizia l'avventura</button><button id="resetGame" class="secondary" style="display:none">Nuova partita</button></div><p style="font-size:11px;color:#afa6c5;margin-top:16px">Muoviti con il joystick o WASD · ✋ parla · ✦ lancia magia · ⇄ cambia magia</p></div></div>
+<div id="menuOverlay" class="overlay hidden"><div class="panel"><button id="closeMenu" class="close" aria-label="Chiudi menu">×</button><h2 id="menuTitle">Diario dell'apprendista</h2><div id="menuContent"></div><div class="buttonRow"><button class="secondary" id="menuJournal">📜 Diario</button><button class="secondary" id="menuMap">🗺️ Mappa</button><button class="secondary" id="menuBag">🎒 Inventario</button><button class="secondary" id="menuSettings">⚙️ Impostazioni</button></div></div></div>
+</div>
+<script>
+(()=>{'use strict';
+const TILE=16, SAVE_KEY='nove-lune-demo-01';
+const canvas=document.querySelector('#screen');let ctx=canvas.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=false;
+const $=id=>document.getElementById(id);
+let VW=480,VH=270,last=0,elapsed=0,savedClock=0,promptTarget=null,toastUntil=0,dialogueLines=[],dialogueIndex=0,dialogueEnd=null,modalOpen=false,playing=false,worldCache={};
+let soundOn=true,audioCtx=null;
+let camera={x:0,y:0};
+const keyDown=new Set(),touchAxis={x:0,y:0},particles=[];
+const state={scene:'courtyard',px:24.5*TILE,py:15.5*TILE,dir:'down',walk:0,stage:0,crystals:[false,false,false],rockMoved:false,hasCrystal:false,spell:'luma',mana:100,gameComplete:false,learned:['luma']};
+const sceneNames={courtyard:'Cortile Centrale',runes:'Aula delle Rune',library:'Biblioteca delle Stelle',grove:'Boschetto dei Sussurri'};
+const scenes={
+ courtyard:{w:46,h:36,spawn:[24.5,15.5],portals:[{id:'runes',x:42,y:19,to:'runes',spawn:[15.5,17.2],label:'Aula delle Rune'},{id:'library',x:3,y:17,to:'library',spawn:[16,18],label:'Biblioteca'},{id:'grove',x:12,y:33,to:'grove',spawn:[17.5,22],label:'Boschetto'}],npcs:[{id:'seris',name:'Maestra Seris',x:20.5,y:15.5,coat:'#7f5cb3',hair:'#ece3cd'},{id:'lia',name:'Lia',x:13.5,y:24.5,coat:'#327b9e',hair:'#a85a3b'},{id:'varen',name:'Varen',x:30.5,y:25,coat:'#78466e',hair:'#241d37'}]},
+ runes:{w:31,h:21,spawn:[15.5,17.2],portals:[{id:'exit',x:15.5,y:19.1,to:'courtyard',spawn:[40,19],label:'Torna al Cortile'}],npcs:[],crystalCoords:[[8,7],[15,6],[22,7]]},
+ library:{w:33,h:23,spawn:[16,18],portals:[{id:'exit',x:16,y:21,to:'courtyard',spawn:[5,17],label:'Torna al Cortile'}],npcs:[{id:'elara',name:'Custode Elara',x:16.5,y:9.3,coat:'#4882a7',hair:'#c78257'}]},
+ grove:{w:35,h:27,spawn:[17.5,23],portals:[{id:'exit',x:17.5,y:25,to:'courtyard',spawn:[12,31],label:'Torna al Cortile'}],npcs:[],rock:{x:17.5,y:13},moonCrystal:{x:17.5,y:7.5}}
+};
+const mapBlocks={};
+function idx(x,y){return x+','+y}
+function block(scene,x,y){(mapBlocks[scene]||(mapBlocks[scene]=new Set())).add(idx(x,y))}
+function unblocked(scene,x,y){return !(mapBlocks[scene]&&mapBlocks[scene].has(idx(x,y)))}
+function initBlocks(){
+ for(const [id,s] of Object.entries(scenes)){const b=mapBlocks[id]=new Set();for(let x=0;x<s.w;x++){b.add(idx(x,0));b.add(idx(x,s.h-1))}for(let y=0;y<s.h;y++){b.add(idx(0,y));b.add(idx(s.w-1,y))}}
+ for(let y=2;y<=10;y++)for(let x=12;x<=33;x++)block('courtyard',x,y);
+ for(let y=19;y<=22;y++)for(let x=20;x<=24;x++)block('courtyard',x,y);
+ for(let x=0;x<46;x++){for(let y=0;y<36;y++){if((x<7||x>38)&&(y<8||y>28) && pseudo(x,y,3)>.46)block('courtyard',x,y)}}
+ for(let x=0;x<31;x++)for(let y=0;y<2;y++)block('runes',x,y);
+ for(let y=2;y<=6;y++){for(let x=2;x<=5;x++)block('runes',x,y);for(let x=25;x<=28;x++)block('runes',x,y)}
+ for(let x=0;x<33;x++)for(let y=0;y<3;y++)block('library',x,y);
+ for(let y=4;y<=7;y++){for(let x of [4,5,6,10,11,12,21,22,23,26,27,28])block('library',x,y)}
+ for(let y=13;y<=15;y++){for(let x of [4,5,6,26,27,28])block('library',x,y)}
+ for(let x=1;x<34;x++){if(x!==17)block('grove',x,13)}
+ for(let y=1;y<26;y++)for(let x=1;x<34;x++){if((x<=4||x>=30)&&pseudo(x,y,11)>.1)block('grove',x,y)}
+ // Enforce a broad corridor, so the spell is required to reach the upper clearing.
+ for(let x=1;x<34;x++){if(x!==17){block('grove',x,12);block('grove',x,14)}}
+}
+function pseudo(x,y,s=0){let n=(Math.imul(x+87,374761393)+Math.imul(y+31,668265263)+s*1234567)|0;n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295}
+function randSeed(x,y,s=0){return pseudo(x,y,s)}
+function resize(){const width=innerWidth,height=innerHeight,ratio=width/height;VW=ratio<.8?Math.round(228):ratio<1.3?Math.round(340):Math.round(480);VH=Math.round(VW/ratio);canvas.width=VW;canvas.height=VH;ctx.imageSmoothingEnabled=false;}
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({scene:state.scene,px:state.px,py:state.py,dir:state.dir,stage:state.stage,crystals:state.crystals,rockMoved:state.rockMoved,hasCrystal:state.hasCrystal,spell:state.spell,mana:state.mana,gameComplete:state.gameComplete,learned:state.learned}))}catch(e){} }
+function load(){try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return false;let s=JSON.parse(raw);if(!scenes[s.scene])return false;for(const k of ['scene','px','py','dir','stage','crystals','rockMoved','hasCrystal','spell','mana','gameComplete','learned'])if(s[k]!==undefined)state[k]=s[k];if(!Array.isArray(state.crystals)||state.crystals.length!==3)state.crystals=[false,false,false];if(!Array.isArray(state.learned))state.learned=['luma'];return true}catch(e){return false}}
+function cleanSave(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}location.reload()}
+function updateUI(){
+ $('location').textContent='☾ '+sceneNames[state.scene];
+ const q=questInfo();$('questTitle').textContent=q.title;$('questHint').textContent=q.hint;
+ $('manaFill').style.width=Math.max(0,state.mana)+'%';
+ $('spellName').textContent=state.spell==='luma'?'LUMA':'IMPULSO';$('cast').textContent=state.spell==='luma'?'✦':'↝';
+ const sub=document.createElement('span');sub.className='actionLabel';sub.id='spellName';sub.textContent=state.spell==='luma'?'LUMA':'IMPULSO';$('cast').appendChild(sub);
+}
+function questInfo(){switch(state.stage){
+ case 0:return {title:'La Campana Silenziosa',hint:'Parla con la Maestra Seris, nel cortile.'};
+ case 1:return {title:'Prima lezione · Luma',hint:'Accendi i tre cristalli nell’Aula delle Rune ('+state.crystals.filter(Boolean).length+'/3).'};
+ case 2:return {title:'Un nuovo potere',hint:'Vai in Biblioteca e parla con la Custode Elara.'};
+ case 3:return {title:'Il cristallo perduto',hint:state.rockMoved?'Raccogli il cristallo nel Boschetto.':'Usa Impulso sul masso nel Boschetto.'};
+ case 4:return {title:'Il ritorno della luce',hint:'Riporta il cristallo alla Maestra Seris.'};
+ default:return {title:'Missione completata ✨',hint:'Esplora l’Accademia: il prossimo capitolo arriverà.'};
+}}
+function sfx(kind){if(!soundOn)return;try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const now=audioCtx.currentTime;const notes=kind==='win'?[523,659,784,1047]:kind==='spell'?[523,784]:kind==='no'?[180]:[392,587];notes.forEach((hz,i)=>{const osc=audioCtx.createOscillator(),vol=audioCtx.createGain();osc.type=kind==='no'?'triangle':'sine';osc.frequency.setValueAtTime(hz,now+i*.09);vol.gain.setValueAtTime(.0001,now+i*.09);vol.gain.exponentialRampToValueAtTime(.035,now+i*.09+.015);vol.gain.exponentialRampToValueAtTime(.0001,now+i*.09+.2);osc.connect(vol);vol.connect(audioCtx.destination);osc.start(now+i*.09);osc.stop(now+i*.09+.22)})}catch(e){}}
+function toast(s,secs=2){$('toast').textContent=s;$('toast').classList.add('visible');toastUntil=elapsed+secs;}
+function talk(name,lines,onEnd){if(modalOpen)return;dialogueLines=Array.isArray(lines)?lines:[lines];dialogueIndex=0;dialogueEnd=onEnd||null;$('dialogueName').textContent=name;$('dialogueText').textContent=dialogueLines[0];$('dialogueNext').textContent=dialogueLines.length>1?'Continua ▸':'Chiudi ✓';$('dialogue').classList.add('visible');sfx('talk')}
+function advanceDialogue(){if(!$('dialogue').classList.contains('visible'))return;dialogueIndex++;if(dialogueIndex<dialogueLines.length){$('dialogueText').textContent=dialogueLines[dialogueIndex];$('dialogueNext').textContent=dialogueIndex===dialogueLines.length-1?'Chiudi ✓':'Continua ▸';return}
+ $('dialogue').classList.remove('visible');const done=dialogueEnd;dialogueEnd=null;if(done)done();updateUI();save();}
+function isDialog(){return $('dialogue').classList.contains('visible')}
+function handleNpc(n){
+ if(n.id==='seris'){
+   if(state.stage===0)return talk('Maestra Seris',['Benvenuto all’Accademia delle Nove Lune, apprendista. Sei arrivato in un momento molto particolare.','La nostra grande campana si è ammutolita. Senza di lei, le energie dell’Accademia si stanno affievolendo.','Ti insegnerò Luma, la magia della luce. Dirigiti nell’Aula delle Rune, a est del cortile, e illumina i tre cristalli.'],()=>{state.stage=1;state.learned=['luma'];toast('✦ Incantesimo appreso: LUMA!');sfx('win')});
+   if(state.stage===1)return talk('Maestra Seris','I tre cristalli dell’Aula delle Rune ti aspettano. Avvicinati e premi ✦ per usare Luma.');
+   if(state.stage===2)return talk('Maestra Seris','Ottimo lavoro! Ora cerca la Custode Elara nella Biblioteca delle Stelle, a ovest del cortile.');
+   if(state.stage===3)return talk('Maestra Seris','Ti serve il cristallo nel Boschetto dei Sussurri. Il sentiero si trova a sud-ovest del cortile.');
+   if(state.stage===4)return talk('Maestra Seris',['Ce l’hai fatta! Il cristallo risuona di nuovo con le nove lune.','Ascolta... la campana ha ripreso a suonare! Il tuo viaggio è soltanto all’inizio.'],()=>{state.stage=5;state.gameComplete=true;state.hasCrystal=false;sfx('win');burst(state.px,state.py-20,'#f9e096',44);toast('🏆 Missione completata! La Campana Silenziosa',4);setTimeout(()=>showVictory(),700)});
+   return talk('Maestra Seris','Le nove lune ti hanno scelto. Continua a esplorare: nuovi misteri attendono l’Accademia.');
+ }
+ if(n.id==='lia')return talk('Lia',['Oh, un nuovo studente! Io sono Lia.','Dicono che certe porte del castello si aprano solo quando una luna è piena... Sarà vero?']);
+ if(n.id==='varen')return talk('Varen','Se pensi di diventare il miglior mago dell’Accademia, dovrai prima superare me. E non sarà facile.');
+ if(n.id==='elara'){
+   if(state.stage===2)return talk('Custode Elara',['Hai riattivato i cristalli? Notevole, per essere al tuo primo giorno.','La campana richiede un cristallo lunare nascosto nel Boschetto dei Sussurri. Ma il sentiero è ostruito da un antico masso.','Ti insegnerò IMPULSO: questa magia sposta gli oggetti incantati. Cambia incantesimo con ⇄ e lancialo con ✦ vicino al masso.'],()=>{state.stage=3;state.learned=['luma','impulso'];state.spell='impulso';toast('↝ Incantesimo appreso: IMPULSO!');sfx('win')});
+   if(state.stage<2)return talk('Custode Elara','La conoscenza ha un suo ordine, apprendista. Completa prima la lezione di Luma nell’Aula delle Rune.');
+   return talk('Custode Elara','Ricorda: Impulso muove gli ostacoli, Luma risveglia i cristalli. Ogni magia ha il proprio segreto.');
+ }
+}
+function transition(p){if(p.id==='runes'&&state.stage===0){toast('Prima parla con la Maestra Seris.');sfx('no');return}
+ if(p.id==='grove'&&state.stage<2){toast('Il Boschetto non è ancora accessibile.');sfx('no');return}
+ state.scene=p.to;state.px=p.spawn[0]*TILE;state.py=p.spawn[1]*TILE;state.dir='up';touchAxis.x=touchAxis.y=0;resetJoystick();burst(state.px,state.py-8,'#c8abff',12);sfx('talk');updateUI();save()}
+function interact(){if(!playing)return;if(isDialog()){advanceDialogue();return}if(modalOpen)return;
+ const p=findNearby();if(!p){toast('Nessun oggetto da esaminare nelle vicinanze.',1.6);return}
+ if(p.type==='npc'){handleNpc(p.data);return}if(p.type==='portal'){transition(p.data);return}
+ if(p.type==='crystal'){toast('Prova a usare Luma con ✦ per accendere il cristallo.');return}
+ if(p.type==='rock'){toast('È un masso incantato. Prova Impulso con ✦.');return}
+ if(p.type==='moonCrystal'){if(state.stage===3&&state.rockMoved){state.hasCrystal=true;state.stage=4;burst(p.x,p.y,'#fff2a2',38);sfx('win');toast('☾ Hai raccolto il Cristallo Lunare!',3);save();updateUI()}else toast('Il cristallo è protetto da un’antica magia.');return}
+ if(p.type==='door'){toast('Le porte del castello sono ancora sigillate. Torna nei prossimi capitoli.');return}
+}
+function findNearby(){let targets=[];const sc=scenes[state.scene],add=(type,data,x,y,priority=0)=>{let d=Math.hypot(state.px-x,state.py-y);if(d<35)targets.push({type,data,x,y,d,priority})};
+ for(let n of sc.npcs)add('npc',n,n.x*TILE,n.y*TILE,0);
+ for(let p of sc.portals)add('portal',p,p.x*TILE,p.y*TILE,1);
+ if(state.scene==='runes')sc.crystalCoords.forEach((xy,i)=>{if(!state.crystals[i])add('crystal',{i},xy[0]*TILE,xy[1]*TILE)});
+ if(state.scene==='grove'){if(!state.rockMoved)add('rock',null,17.5*TILE,13*TILE);if(!state.hasCrystal&&state.stage>=3)add('moonCrystal',null,17.5*TILE,7.5*TILE)}
+ if(state.scene==='courtyard')add('door',null,22.5*TILE,11.2*TILE);
+ targets.sort((a,b)=>a.d-b.d||a.priority-b.priority);return targets[0]||null;}
+function chooseSpell(){if(!playing||modalOpen||isDialog())return;if(!state.learned.includes('impulso')){toast('Imparerai Impulso più avanti.');return}state.spell=state.spell==='luma'?'impulso':'luma';sfx('talk');updateUI()}
+function burst(x,y,color,count=14){for(let i=0;i<count;i++){let a=pseudo(i,Math.round(x),Math.round(y))*Math.PI*2,r=15+pseudo(i,Math.round(y),Math.round(x))*48;particles.push({x,y,vx:Math.cos(a)*r,vy:Math.sin(a)*r-14,age:0,life:.4+pseudo(i,7,99)*.6,color,size:i%3===0?3:2})}}
+function cast(){if(!playing||isDialog()||modalOpen)return;if(state.stage===0){toast('Prima incontra la Maestra Seris.');return}if(state.mana<18){toast('Energia magica insufficiente. Aspetta qualche secondo.');sfx('no');return}state.mana-=18;sfx('spell');updateUI();burst(state.px,state.py-12,state.spell==='luma'?'#ffdc7f':'#75c9ff',17);
+ let targets=[];if(state.scene==='runes')scenes.runes.crystalCoords.forEach(([x,y],i)=>{if(!state.crystals[i])targets.push({type:'crystal',x:x*TILE,y:y*TILE,i})});
+ if(state.scene==='grove'&&!state.rockMoved)targets.push({type:'rock',x:17.5*TILE,y:13*TILE});
+ targets=targets.map(t=>({...t,d:Math.hypot(t.x-state.px,t.y-state.py)})).filter(t=>t.d<=58).sort((a,b)=>a.d-b.d);
+ const match=targets[0];if(match&&match.type==='crystal'&&state.spell==='luma'){
+   state.crystals[match.i]=true;burst(match.x,match.y,'#ffeaa1',35);toast('Cristallo acceso! '+state.crystals.filter(Boolean).length+'/3');if(state.crystals.every(Boolean)&&state.stage===1){state.stage=2;setTimeout(()=>talk('Voce misteriosa',['I tre cristalli si illuminano insieme. Nell’aria compare una scritta antica...','«La biblioteca custodisce il sapere necessario per ritrovare ciò che è perduto.»']),520);sfx('win')}
+   updateUI();save();return;
+ }
+ if(match&&match.type==='rock'&&state.spell==='impulso'&&state.stage>=3){state.rockMoved=true;burst(match.x,match.y,'#94d9ff',30);toast('Il masso si è spostato! Il sentiero è libero.');sfx('win');updateUI();save();return}
+ if(match&&match.type==='rock'&&state.spell==='luma'){toast('La luce non sposta questo masso. Serve Impulso.');return}
+ if(match&&match.type==='crystal'&&state.spell==='impulso'){toast('Questo cristallo risponde alla luce: usa Luma.');return}
+ toast(state.spell==='luma'?'✦ Luma illumina il sentiero.':'↝ L’aria vibra sotto l’effetto di Impulso.',1.4);
+}
+function showVictory(){if(!state.gameComplete)return;let overlay=$('menuOverlay');modalOpen=true;$('menuTitle').textContent='✦ Capitolo completato!';$('menuContent').innerHTML='<p style="font-size:16px;text-align:center">La campana è tornata a suonare e il primo frammento delle Nove Lune è stato risvegliato.</p><div class="infoList"><span>✓ 2 incantesimi</span><span>✓ 4 zone esplorabili</span><span>✓ Cristallo recuperato</span></div><p style="text-align:center">Puoi continuare a esplorare liberamente. Questa è la prima versione giocabile della nostra avventura!</p>';
+ overlay.classList.remove('hidden')}
+function showMenu(tab='journal'){if(!playing||isDialog())return;modalOpen=true;const overlay=$('menuOverlay');overlay.classList.remove('hidden');renderMenu(tab)}
+function renderMenu(tab){const labels={journal:'Diario dell’apprendista',map:'Mappa di Elaria',bag:'Inventario',settings:'Impostazioni'};$('menuTitle').textContent=labels[tab]||labels.journal;let html='';if(tab==='journal'){let q=questInfo();html='<h3>📜 La Campana Silenziosa</h3><p><b>'+q.title+'</b></p><p>'+q.hint+'</p><h3>Progressi</h3><ul><li>Prima lezione: '+(state.stage>=1?'✓':'da iniziare')+'</li><li>Cristalli dell’Aula delle Rune: '+state.crystals.filter(Boolean).length+'/3</li><li>Impulso: '+(state.learned.includes('impulso')?'✓ imparato':'non ancora imparato')+'</li><li>Recupero del cristallo: '+(state.stage>=4?'✓':'da completare')+'</li><li>La Campana Silenziosa: '+(state.stage>=5?'✓ completata':'in corso')+'</li></ul>'}
+ else if(tab==='map'){html='<p>Un’antica mappa della regione centrale dell’Accademia.</p><div class="mapgrid"><div class="mapcell">🌙<br>Torre Astrale<br><small>Futura</small></div><div class="mapcell">🏰<br>Castello<br><small>Futuro</small></div><div class="mapcell '+(state.scene==='runes'?'current':'')+'">✨<br>Aula delle Rune</div><div class="mapcell '+(state.scene==='library'?'current':'')+'">📚<br>Biblioteca</div><div class="mapcell '+(state.scene==='courtyard'?'current':'')+'">☾<br>Cortile Centrale</div><div class="mapcell">🌿<br>Serra Lunare<br><small>Futura</small></div><div class="mapcell">🏘️<br>Borgo<br><small>Futuro</small></div><div class="mapcell '+(state.scene==='grove'?'current':'')+'">🌳<br>Boschetto</div><div class="mapcell">🗝️<br>Catacombe<br><small>Future</small></div></div><p>Sei qui: <b>'+sceneNames[state.scene]+'</b></p>'}
+ else if(tab==='bag'){html='<h3>🎒 Oggetti</h3><p>🪄 <b>Bacchetta dell’Apprendista</b> — Un dono dell’Accademia.</p>'+(state.hasCrystal?'<p>💎 <b>Cristallo Lunare</b> — Brilla di luce antica.</p>':'<p>La tasca degli oggetti speciali è vuota.</p>')+'<h3>✨ Incantesimi</h3><p>✦ <b>Luma</b> — Luce, rivela e risveglia.</p>'+(state.learned.includes('impulso')?'<p>↝ <b>Impulso</b> — Muove i massi incantati.</p>':'<p>🔒 Il secondo incantesimo verrà insegnato più avanti.</p>')}
+ else {html='<h3>Controlli</h3><p>📱 Joystick per camminare · ✋ interagire · ✦ magia · ⇄ cambiare.</p><p>⌨️ <span class="kbd">WASD</span> o frecce per camminare, <span class="kbd">E</span> parlare, <span class="kbd">SPAZIO</span> magia, <span class="kbd">Q</span> cambiare, <span class="kbd">M</span> mappa, <span class="kbd">J</span> diario.</p><h3>Opzioni</h3><p><button id="soundToggle" class="secondary">'+(soundOn?'🔊 Disattiva':'🔇 Attiva')+' effetti sonori</button></p><p><button id="resetFromSettings" class="secondary">Ricomincia da zero</button></p><p style="font-size:11px;color:#bdb0c7">I progressi vengono salvati in questo browser.</p>'}
+ $('menuContent').innerHTML=html;
+ let so=$('soundToggle');if(so)so.onclick=()=>{soundOn=!soundOn;renderMenu('settings')};let re=$('resetFromSettings');if(re)re.onclick=()=>{if(confirm('Eliminare i progressi e iniziare una nuova partita?'))cleanSave()};}
+function closeMenu(){modalOpen=false;$('menuOverlay').classList.add('hidden');save()}
+function handleKeys(e,down){const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' ','w','a','s','d'].includes(k))e.preventDefault();if(down){if(keyDown.has(k))return;keyDown.add(k);if(k==='escape'){if(modalOpen)closeMenu();else if(isDialog())advanceDialogue();return}if(modalOpen)return;if(k==='e'||k==='enter')interact();if(k===' ')cast();if(k==='q')chooseSpell();if(k==='m')showMenu('map');if(k==='j')showMenu('journal');if(k==='i')showMenu('bag')}else keyDown.delete(k)}
+function resetJoystick(){const stick=$('stick');stick.style.transform='translate(0px,0px)'}
+function bindJoystick(){const joy=$('joystick'),stick=$('stick');let pid=null;function update(e){const rect=joy.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const lim=rect.width*.30,d=Math.hypot(dx,dy);if(d>lim){dx=dx/d*lim;dy=dy/d*lim}touchAxis.x=dx/lim;touchAxis.y=dy/lim;stick.style.transform=`translate(${dx}px,${dy}px)`}
+ joy.addEventListener('pointerdown',e=>{e.preventDefault();pid=e.pointerId;joy.setPointerCapture(pid);update(e)});joy.addEventListener('pointermove',e=>{if(pid===e.pointerId)update(e)});function end(e){if(pid!==e.pointerId)return;pid=null;touchAxis.x=touchAxis.y=0;resetJoystick()}joy.addEventListener('pointerup',end);joy.addEventListener('pointercancel',end);joy.addEventListener('lostpointercapture',end);}
+function collision(px,py){const sc=scenes[state.scene],r=5;for(const [x,y] of [[px-r,py-r],[px+r,py-r],[px-r,py+r],[px+r,py+r]]){let tx=Math.floor(x/TILE),ty=Math.floor(y/TILE);if(tx<1||ty<1||tx>=sc.w-1||ty>=sc.h-1)return true;if(state.scene==='grove'&&tx===17&&[12,13,14].includes(ty)){if(ty===13&&!state.rockMoved)return true;else continue}if(!unblocked(state.scene,tx,ty))return true}return false}
+function update(dt){elapsed+=dt;state.mana=Math.min(100,state.mana+dt*10);savedClock+=dt;if(savedClock>9&&playing){save();savedClock=0}
+ if($('toast').classList.contains('visible')&&elapsed>toastUntil)$('toast').classList.remove('visible');
+ if(!playing||isDialog()||modalOpen)return;
+ let x=touchAxis.x+(keyDown.has('d')||keyDown.has('arrowright')?1:0)-(keyDown.has('a')||keyDown.has('arrowleft')?1:0),y=touchAxis.y+(keyDown.has('s')||keyDown.has('arrowdown')?1:0)-(keyDown.has('w')||keyDown.has('arrowup')?1:0);let mag=Math.hypot(x,y);if(mag>.12){x/=Math.max(1,mag);y/=Math.max(1,mag);const speed=81;const nx=state.px+x*speed*dt,ny=state.py+y*speed*dt;if(!collision(nx,state.py))state.px=nx;if(!collision(state.px,ny))state.py=ny;if(Math.abs(x)>Math.abs(y))state.dir=x>0?'right':'left';else state.dir=y>0?'down':'up';state.walk+=dt*9}
+ promptTarget=findNearby();if(promptTarget){let label=promptTarget.type==='npc'?'Parla con '+promptTarget.data.name:promptTarget.type==='portal'?'Entra: '+promptTarget.data.label:promptTarget.type==='moonCrystal'?'Raccogli il Cristallo Lunare':promptTarget.type==='rock'?'Esamina il masso':promptTarget.type==='crystal'?'Cristallo magico':'Porta sigillata';$('prompt').textContent='✋ '+label;$('prompt').classList.add('visible')}else $('prompt').classList.remove('visible');
+ for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=25*dt;if(p.age>=p.life)particles.splice(i,1)}
+}
+// Canvas pixel-art engine: all sprites and tiles are drawn at the internal low-resolution viewport.
+function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.floor(x),Math.floor(y),Math.ceil(w),Math.ceil(h))}
+function line(x1,y1,x2,y2,c,w=1){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(Math.floor(x1)+.5,Math.floor(y1)+.5);ctx.lineTo(Math.floor(x2)+.5,Math.floor(y2)+.5);ctx.stroke()}
+function ellipse(x,y,rx,ry,c){ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(Math.floor(x),Math.floor(y),Math.max(1,rx),Math.max(1,ry),0,0,Math.PI*2);ctx.fill()}
+function frameBox(x,y,w,h,fill,stroke){rect(x,y,w,h,fill);rect(x,y,w,2,stroke);rect(x,y+h-2,w,2,stroke);rect(x,y,2,h,stroke);rect(x+w-2,y,2,h,stroke)}
+function groundTile(x,y,kind,seed){const t=TILE,r=randSeed(x,y,seed);let px=x*t,py=y*t;switch(kind){
+ case 'grass':rect(px,py,t,t,r>.67?'#4b7854':r>.32?'#497451':'#426c4b');rect(px+2+r*7,py+2+(r*13)%9,2,2,'#608864');if(r>.86){rect(px+10,py+10,2,2,'#93a968');rect(px+12,py+8,2,2,'#e4a5b1')}if(r<.16)rect(px+7,py+12,4,1,'#355b44');break;
+ case 'stone':rect(px,py,t,t,r>.5?'#a9a19c':'#9a9799');rect(px,py,t,1,'#c7b7a8');rect(px,py,1,t,'#797a82');rect(px+t-1,py,1,t,'#756f78');rect(px,py+t-1,t,1,'#777482');if(r>.83)rect(px+5,py+8,4,1,'#b9b1ab');break;
+ case 'floor':rect(px,py,t,t,r>.5?'#777080':'#837b8a');rect(px,py,t,1,'#9e91a0');rect(px,py,1,t,'#686274');if(r>.89)rect(px+6,py+9,3,2,'#928b99');break;
+ case 'soil':rect(px,py,t,t,r>.5?'#89734f':'#857047');rect(px,py,t,1,'#b18e5b');rect(px+Math.floor(r*10),py+Math.floor(r*11),2,2,'#6a6044');break;
+ case 'water':rect(px,py,t,t,r>.5?'#2d7890':'#347e9a');rect(px+2,py+5,7,1,'#7bd5c9');if(r>.5)rect(px+9,py+12,5,1,'#96e7e4');break;
+ }}
+function drawTree(x,y,seed=0){const r=randSeed(x,y,seed),xx=x*TILE,yy=y*TILE;ellipse(xx+8,yy+15,18,5,'#243b35');rect(xx+5,yy-11,7,26,'#65443f');rect(xx+7,yy-12,2,25,'#9a6d55');for(const [dx,dy,s,c] of [[-10,-19,13,'#295d49'],[8,-23,16,'#367a55'],[-1,-32,16,'#407e5c'],[15,-13,11,'#285b49'],[-18,-10,10,'#397953']]){ellipse(xx+dx+8,yy+dy,s,s*.82,c)}for(let i=0;i<17;i++){const px=xx+(pseudo(i,seed,2)-.5)*42+7,py=yy-34+pseudo(i,seed,3)*27;rect(px,py,2,2,r>.65?'#b1c97a':'#65a476')}}
+function drawBush(x,y,seed=0){let xx=x*TILE,yy=y*TILE;ellipse(xx+8,yy+14,12,4,'#243a36');ellipse(xx+4,yy+9,9,7,'#2d6146');ellipse(xx+13,yy+7,9,8,'#46805a');ellipse(xx+8,yy+3,7,6,'#559061');if(pseudo(x,y,seed)>.55){rect(xx+4,yy+6,2,2,'#f4b5c3');rect(xx+13,yy+8,2,2,'#e0b3db')}}
+function drawLamppost(x,y){let xx=x*TILE,yy=y*TILE;ellipse(xx+8,yy+15,6,2,'#3b354b');rect(xx+6,yy-18,4,34,'#463b54');rect(xx+4,yy-21,8,5,'#bc9567');rect(xx+5,yy-29,6,9,'#ffc86b');rect(xx+7,yy-27,2,5,'#fff4b4');rect(xx+3,yy-31,10,3,'#57435b');rect(xx+4,yy-32,8,2,'#ad866d')}
+function drawArch(x,y,color='#8b7890'){const xx=x*TILE,yy=y*TILE;rect(xx-11,yy-30,8,42,color);rect(xx+13,yy-30,8,42,color);rect(xx-11,yy-36,32,8,'#bab0ba');rect(xx-8,yy-42,26,9,'#665974');rect(xx-10,yy+9,31,5,'#e1bd8e');rect(xx-1,yy-46,9,5,'#ffda87')}
+function drawSign(x,y,label){ctx.fillStyle='#28203d';ctx.strokeStyle='#e0b47c';ctx.lineWidth=1;ctx.fillRect(x-39,y-16,78,15);ctx.strokeRect(x-39+.5,y-16+.5,77,14);ctx.fillStyle='#ffe3b1';ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x,y-8);ctx.textBaseline='alphabetic'}
+function drawCastle(){const x=12*TILE,y=2*TILE,w=22*TILE,h=9*TILE;rect(x-5,y+125,w+10,15,'#605769');rect(x,y+20,w,h-20,'#79728a');for(let i=0;i<22;i++){rect(x+i*16,y+34,16,1,'#9b90a0');rect(x+i*16,y+72,16,1,'#5c586a');if(i%2===0)rect(x+i*16,y+56,1,10,'#948a97')}
+ // roof outline
+ rect(x-9,y+17,w+18,7,'#40364f');rect(x-5,y+11,w+10,6,'#6d4970');rect(x+9,y+7,w-18,5,'#896482');
+ for(let tx of [x+5,x+w-33,x+w/2-25,x+w/2+9]){rect(tx,y-2,22,58,'#706984');rect(tx-3,y-5,28,7,'#352e4d');rect(tx+2,y-30,18,25,'#605b82');rect(tx+7,y-39,8,9,'#382c51');rect(tx+5,y+3,7,19,'#f7b85d');rect(tx+7,y+5,3,14,'#fff0a3')}
+ for(let tx of [x+36,x+86,x+236,x+287]){rect(tx,y+53,25,36,'#4f465f');rect(tx+4,y+56,17,28,'#ffc876');rect(tx+8,y+60,3,20,'#fff1ad');rect(tx+3,y+65,19,3,'#805970')}
+ const dx=22.5*TILE;rect(dx-23,y+87,46,56,'#4a3449');rect(dx-18,y+88,36,54,'#654455');rect(dx-14,y+96,28,46,'#2b243e');rect(dx-2,y+96,4,46,'#6d5065');rect(dx+9,y+118,3,3,'#f6ca77');
+ rect(dx-27,y+83,54,6,'#c6b2a4');rect(dx-27,y+85,5,57,'#d4bca2');rect(dx+22,y+85,5,57,'#d4bca2');
+ for(let sy=0;sy<3;sy++){rect(dx-30-sy*5,y+143+sy*6,60+sy*10,6,sy%2?'#a99ba4':'#c4b5af')}
+ // banners
+ for(let tx of [x+108,x+246]){rect(tx,y+39,17,41,'#52376f');rect(tx+7,y+43,4,24,'#f7d28c');ellipse(tx+8,y+55,4,8,'#503970');rect(tx+2,y+40,13,2,'#ebbf76')}
+}
+function drawFountain(){const x=22.5*TILE,y=20.5*TILE;ellipse(x,y+13,52,21,'#5c5873');ellipse(x,y+9,48,18,'#c8bbaa');ellipse(x,y+6,42,14,'#4e99ab');ellipse(x,y+6,32,9,'#79c9ce');ellipse(x,y+6,16,4,'#c7edf0');rect(x-4,y-10,8,17,'#a5b7c5');ellipse(x,y-11,9,5,'#e2ceab');rect(x-2,y-26,4,17,'#7bd4ea');rect(x-9,y-6,2,8,'#9deaf3');rect(x+8,y-6,2,8,'#9deaf3')}
+function drawMoonCircle(x,y){ellipse(x,y,30,18,'#c3ae90');ellipse(x,y,27,15,'#97807a');line(x-26,y,x+26,y,'#edd7a2');line(x,y-15,x,y+15,'#edd7a2');ellipse(x,y,7,7,'#efdaa9');ellipse(x,y,3,3,'#b7a487')}
+function drawCourtyard(){const s=scenes.courtyard;for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++){let stone=x>=8&&x<=37&&y>=10&&y<=34,road=(x<=9&&y>=16&&y<=19)||(x>=35&&y>=18&&y<=21)||(x>=11&&x<=14&&y>=26);groundTile(x,y,stone||road?'stone':'grass',1)}
+ // Flower beds
+ for(let i=0;i<18;i++){let x=i%9*3+8,y=i<9?13:30;drawBush(x,y,i)}
+ for(let [x,y] of [[4,5],[8,7],[40,7],[43,11],[5,27],[41,29],[4,30],[44,31]])drawTree(x,y,x+y);
+ // flower shrubs in border
+ for(let [x,y] of [[11,15],[11,22],[35,15],[35,23],[17,31],[28,31]])drawBush(x,y,x+y);
+ drawCastle();drawFountain();drawMoonCircle(22.5*TILE,30*TILE);for(let [x,y] of [[16,17],[30,17],[16,26],[30,26]])drawLamppost(x,y);
+ for(let p of s.portals){drawArch(p.x,p.y);drawSign(p.x*TILE,p.y*TILE-15,p.label==='Aula delle Rune'?'AULA DELLE RUNE':p.label==='Biblioteca'?'BIBLIOTECA':'BOSCHETTO')}
+}
+function drawBookshelf(x,y,w=3,h=4){let xx=x*TILE,yy=y*TILE;rect(xx,yy,w*TILE,h*TILE,'#443246');rect(xx+3,yy+3,w*TILE-6,h*TILE-6,'#71533e');for(let row=0;row<h;row++){rect(xx+3,yy+row*16+13,w*TILE-6,3,'#c18e55');for(let col=0;col<w*4-2;col++){let color=['#526c98','#c39c65','#865d92','#9d675d','#658e8f'][Math.floor(randSeed(x+col,y+row,5)*5)];rect(xx+5+col*3,yy+row*16+5,2,8,color)}}}
+function drawRunes(){const s=scenes.runes;for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)groundTile(x,y,'floor',10);
+ for(let x=0;x<s.w;x++){rect(x*TILE,0,16,32,'#55516c');rect(x*TILE,24,16,3,'#8c7892')}
+ for(let x of [2,25]){frameBox(x*TILE,2*TILE,4*TILE,5*TILE,'#51485c','#a493a3');for(let y=0;y<4;y++)rect(x*TILE+5,2*TILE+5+y*16,3,10,'#9982b0')}
+ rect(14*TILE,12*TILE,3*TILE,7*TILE,'#674968');for(let y=12;y<19;y++)rect(15*TILE,y*TILE,1,16,'#c38d9d');drawMoonCircle(15.5*TILE,12*TILE);
+ for(let xy of s.crystalCoords){const [x,y]=xy;ellipse(x*TILE,y*TILE+6,18,7,'#41415d');rect(x*TILE-7,y*TILE-2,14,13,'#81778b');rect(x*TILE-5,y*TILE-8,10,9,'#ac96aa')}
+ for(let [x,y] of [[5,11],[26,11],[5,17],[26,17]])drawLamppost(x,y);
+ drawArch(15.5,19,'#ab879d');
+}
+function drawLibrary(){const s=scenes.library;for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++)groundTile(x,y,'floor',23);
+ rect(0,0,s.w*TILE,3*TILE,'#5b485b');for(let x=0;x<s.w;x++)rect(x*TILE,2*TILE,15,3,'#b99077');
+ for(let [x,y,w,h] of [[4,4,3,4],[10,4,3,4],[21,4,3,4],[26,4,3,4],[4,13,3,3],[26,13,3,3]])drawBookshelf(x,y,w,h);
+ rect(13*TILE,12*TILE,7*TILE,5*TILE,'#5e4569');rect(14*TILE,13*TILE,5*TILE,3*TILE,'#8d6282');rect(15*TILE,14*TILE,3*TILE,TILE,'#b9867c');
+ rect(13*TILE,10*TILE,7*TILE,2*TILE,'#654c38');rect(14*TILE,10*TILE+4,5*TILE,14,'#caa072');rect(15*TILE,10*TILE+8,2*TILE,5,'#e9d9ac');
+ for(let [x,y] of [[8,10],[24,10],[8,18],[24,18]])drawLamppost(x,y);
+ drawArch(16,21,'#9d87a9');
+}
+function drawGrove(){const s=scenes.grove;for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++){const path=Math.abs(x-17)<3||(y<13&&x>13&&x<22);groundTile(x,y,path?'soil':'grass',19)}
+ for(let y=2;y<s.h-1;y++)for(let x=1;x<s.w-1;x++){if((x<5||x>29)&&pseudo(x,y,11)>.1)drawTree(x,y,13)}
+ for(let x=1;x<34;x++){if(x===17)continue;drawBush(x,13,x)}
+ for(let [x,y] of [[8,4],[26,5],[9,19],[27,19],[6,23],[28,23],[12,7],[23,8]])drawTree(x,y,x+y);
+ drawMoonCircle(17.5*TILE,7.5*TILE);
+ drawArch(17.5,25,'#6e7192');
+}
+function baseLayer(scene){if(worldCache[scene])return worldCache[scene];const s=scenes[scene];const c=document.createElement('canvas');c.width=s.w*TILE;c.height=s.h*TILE;const old=ctx;ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;
+ if(scene==='courtyard')drawCourtyard();else if(scene==='runes')drawRunes();else if(scene==='library')drawLibrary();else drawGrove();
+ ctx=old;worldCache[scene]=c;return c;
+}
+function crystal(x,y,lit){const t=elapsed;ellipse(x,y+7,12,5,'#352e52');rect(x-7,y+4,14,5,'#9788a4');if(lit){let glow=3+Math.sin(t*4)*2;ellipse(x,y-9,10+glow,17+glow,'#e5a95739');}
+ // diamond using pixel blocks
+ rect(x-3,y-17,7,3,lit?'#fff5ba':'#9e8799');rect(x-7,y-13,15,12,lit?'#f2d071':'#988aad');rect(x-4,y-10,8,12,lit?'#ffeda7':'#b7a8c0');rect(x-1,y-7,3,9,lit?'#fff8d5':'#dfd2df');rect(x-5,y+2,11,3,lit?'#d59b59':'#746680')}
+function drawRock(x,y){ellipse(x,y+7,15,6,'#394236');rect(x-13,y-1,26,10,'#666571');rect(x-10,y-9,21,12,'#878393');rect(x-5,y-13,12,9,'#b1abb3');rect(x-9,y-5,5,2,'#d0bcc2');rect(x+4,y+1,6,2,'#4d536b')}
+function drawNpc(n){drawCharacter(n.x*TILE,n.y*TILE,n.coat,n.hair,'down',Math.sin(elapsed*1.5)>0?0:1);const px=n.x*TILE,py=n.y*TILE-25;rect(px-1,py,3,4,'#fce7a7')}
+function drawCharacter(x,y,coat='#684694',hair='#9b684e',dir='down',frame=0){let xx=Math.round(x),yy=Math.round(y),bob=(frame%2===1?1:0);ellipse(xx,yy+3,9,3,'#1e27327f');rect(xx-6,yy-4,5,7,'#232038');rect(xx+1,yy-4,5,7,'#232038');rect(xx-6,yy-10+bob,12,10,coat);rect(xx-5,yy-17+bob,11,9,'#e7b994');rect(xx-7,yy-18+bob,14,5,hair);rect(xx-5,yy-22+bob,10,6,coat);rect(xx-2,yy-25+bob,4,4,coat);rect(xx-6,yy-10+bob,2,9,'#4d3668');rect(xx+4,yy-10+bob,2,9,'#4d3668');rect(xx-9,yy-9+bob,3,7,coat);rect(xx+6,yy-9+bob,3,7,coat);rect(xx-9,yy-4+bob,3,3,'#e5b893');rect(xx+6,yy-4+bob,3,3,'#e5b893');rect(xx-1,yy-10+bob,2,8,'#c7a17a');if(dir!=='up'){rect(xx-4,yy-14+bob,2,2,'#282438');rect(xx+3,yy-14+bob,2,2,'#282438')}else rect(xx-5,yy-16+bob,11,3,hair);if(dir==='left')rect(xx+3,yy-14+bob,2,2,'#e7b994');if(dir==='right')rect(xx-4,yy-14+bob,2,2,'#e7b994');rect(xx+6,yy-8+bob,2,9,'#b98557');rect(xx+5,yy-12+bob,4,4,'#efdc96')}
+function drawPortals(){const s=scenes[state.scene];for(const p of s.portals){let x=p.x*TILE,y=p.y*TILE;ellipse(x,y+3,18,6,'#ba9af04a');ellipse(x,y-8,7,15,'#c89cdd36');for(let i=0;i<3;i++)rect(x-6+i*5,y-20+Math.sin(elapsed*3+i*2)*4,2,2,'#eec8ff')}}
+function drawScene(){ctx.clearRect(0,0,VW,VH);const sc=scenes[state.scene];let worldW=sc.w*TILE,worldH=sc.h*TILE;camera.x=Math.round(Math.max(0,Math.min(worldW-VW,state.px-VW*.5)));camera.y=Math.round(Math.max(0,Math.min(worldH-VH,state.py-VH*.68)));ctx.fillStyle='#141b2a';ctx.fillRect(0,0,VW,VH);
+ ctx.save();ctx.translate(-camera.x,-camera.y);ctx.drawImage(baseLayer(state.scene),0,0);
+ drawPortals();
+ if(state.scene==='runes')sc.crystalCoords.forEach(([x,y],i)=>crystal(x*TILE,y*TILE,state.crystals[i]));
+ if(state.scene==='grove'){if(!state.rockMoved)drawRock(17.5*TILE,13*TILE);if(!state.hasCrystal&&state.stage>=3){crystal(17.5*TILE,7.5*TILE,true);if(state.stage>=3)for(let i=0;i<3;i++){let a=elapsed*1.5+i*2.1;rect(17.5*TILE+Math.cos(a)*15,7.5*TILE-8+Math.sin(a)*10,2,2,'#fff2b5')}}}
+ const actors=[...sc.npcs.map(n=>({y:n.y*TILE,draw:()=>drawNpc(n)})),{y:state.py,draw:()=>drawCharacter(state.px,state.py,'#654195','#9d5a35',state.dir,Math.floor(state.walk)%2)}].sort((a,b)=>a.y-b.y);for(const a of actors)a.draw();
+ for(const p of particles){ctx.globalAlpha=Math.max(0,1-p.age/p.life);rect(p.x,p.y,p.size,p.size,p.color)}ctx.globalAlpha=1;
+ if(state.gameComplete&&state.scene==='courtyard'){const x=22.5*TILE,y=11*TILE;for(let i=0;i<8;i++){let a=i/8*Math.PI*2+elapsed*.3;rect(x+Math.cos(a)*16,y-24+Math.sin(a)*13,2,2,'#fff6a8')}}
+ ctx.restore();
+ // slow ambient shimmer; subtle vignette and twinkling moon motifs
+ for(let i=0;i<7;i++){let a=pseudo(i,8,11)*VW,b=pseudo(i,9,33)*VH;if(Math.sin(elapsed*(1+i*.15)+i*2)>.82)rect(a,b,1,1,'#d4cdf488')}
+}
+function tick(t){if(!last)last=t;const dt=Math.min((t-last)/1000,.06);last=t;if(playing)update(dt);else elapsed+=dt;drawScene();requestAnimationFrame(tick)}
+function init(){initBlocks();resize();addEventListener('resize',resize);addEventListener('keydown',e=>handleKeys(e,true));addEventListener('keyup',e=>handleKeys(e,false));addEventListener('blur',()=>{keyDown.clear();touchAxis.x=touchAxis.y=0;resetJoystick();if(playing)save()});addEventListener('pagehide',save);bindJoystick();$('interact').addEventListener('click',interact);$('cast').addEventListener('click',cast);$('switchSpell').addEventListener('click',chooseSpell);$('dialogueNext').onclick=advanceDialogue;$('menuButton').onclick=()=>showMenu('journal');$('mapButton').onclick=()=>showMenu('map');$('closeMenu').onclick=closeMenu;$('menuJournal').onclick=()=>renderMenu('journal');$('menuMap').onclick=()=>renderMenu('map');$('menuBag').onclick=()=>renderMenu('bag');$('menuSettings').onclick=()=>renderMenu('settings');$('menuOverlay').addEventListener('click',e=>{if(e.target.id==='menuOverlay')closeMenu()});
+ const hasSave=load();$('startGame').textContent=hasSave?'✦ Continua l’avventura':'✦ Inizia l’avventura';$('resetGame').style.display=hasSave?'':'none';$('resetGame').onclick=cleanSave;$('startGame').onclick=()=>{playing=true;$('startOverlay').classList.add('hidden');updateUI();toast('☾ Benvenuto all’Accademia delle Nove Lune!',3);sfx('talk')};updateUI();requestAnimationFrame(tick);
+ if(location.protocol==='https:'&&'serviceWorker'in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}
+ }
+ init();
+ window.__NOVE_LUNE_DEBUG__={state,scenes,mapBlocks,collision,findNearby,reset:cleanSave,save,questInfo,transition,cast,interact,advanceDialogue,renderMenu,canvas,baseLayer,updateUI,showMenu,closeMenu};
+})();
+</script>
+</body>
+</html>
