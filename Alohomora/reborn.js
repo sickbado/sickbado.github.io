@@ -1,4 +1,4 @@
-/* ALOHOMORA · REBORN 1.2.1 — The Living Highlands, Chapter I — mobile 3D vertical slice.
+/* ALOHOMORA · REBORN 1.2.2 — The Living Highlands, Chapter I — mobile 3D vertical slice.
  * Rendering: Babylon.js, animations: GLB (optional) + procedural fallback.
  * Character source: three.js examples Soldier.glb (MIT sample). Geometry/textures
  * created here are original; 3D asset is optional and loaded separately.
@@ -611,7 +611,7 @@
     game.hp=Math.min(100,game.hp+40);game.mana=100;game.xp+=250;
     // Reward continuous exploration instead of closing the game after the first mission.
   }
-  function tick(){const now=performance.now(),dt=clamp((now-last)/1000,.001,.042);last=now;phase+=dt;effectClock+=dt;
+  function tick(){const now=performance.now();if(document.hidden){last=now;return;}const dt=clamp((now-last)/1000,.001,.042);last=now;phase+=dt;effectClock+=dt;
     sky.position.copyFrom(cam.position);
     for(const torch of game.torches)torch.light.intensity=(mobile?.55:.78)+Math.sin(phase*10+torch.phase)*.10+Math.sin(phase*3.3+torch.phase)*.07;
     if(game.running){if(!world.onTrain)movePlayer(dt);updateEnemy(dt);updateProps(dt);updateProjectiles(dt);game.mana=Math.min(100,game.mana+dt*7.6);game.shield=Math.max(0,game.shield-dt);game.pulse=Math.max(0,game.pulse-dt);updatePortal(dt);if(game.toastTimeout>0){game.toastTimeout-=dt;if(game.toastTimeout<=0)$('toast').classList.remove('show');}}
@@ -643,11 +643,11 @@
       engine.resize();});
     $('start').addEventListener('click',()=>{if(!scene){error('Il motore grafico non è pronto. Ricarica la pagina.');return;}try{const AC=window.AudioContext||window.webkitAudioContext;if(AC&&!game.audio)game.audio=new AC();game.audio?.resume?.();reset();}catch(ex){error('Avvio interrotto: '+ex.message)}});
     $('restart').addEventListener('click',reset);window.addEventListener('resize',()=>engine?.resize());window.addEventListener('orientationchange',()=>setTimeout(()=>engine?.resize(),220));
-    document.addEventListener('visibilitychange',()=>{last=performance.now();inputs.keys.clear();inputs.axisX=inputs.axisY=0;knob.style.transform='translate(0,0)';});
+    document.addEventListener('visibilitychange',()=>{last=performance.now();inputs.keys.clear();inputs.axisX=inputs.axisY=0;knob.style.transform='translate(0,0)';if(document.hidden&&game.running)saveWorld();});window.addEventListener('pagehide',()=>{if(game.running)saveWorld();});
     document.addEventListener('contextmenu',e=>e.preventDefault());
   }
   async function checkForUpdate(){try{const r=await fetch('./version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;
-    const v=await r.json();if(v.version&&v.version!=='1.2.1'){
+    const v=await r.json();if(v.version&&v.version!=='1.2.2'){
       const btn=$('updateBanner');if(btn){btn.classList.remove('hidden');btn.textContent='✦ Nuovo Alohomora '+v.version+' disponibile · Tocca per aggiornare';}
     }}catch(e){}}
   function boot(){if(!B){error('Impossibile caricare Babylon.js. Verifica la connessione Internet e ricarica.');return;}
